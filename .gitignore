@@ -1,4 +1,11 @@
-# Byte-compiled / optimized / DLL files
+
+*.zip
+models
+.DS_store
+tmp/*
+bin/*
+
+pip# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
