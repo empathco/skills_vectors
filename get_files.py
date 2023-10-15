@@ -20,7 +20,7 @@ def extract_files_from_database():
         rows = cursor.fetchall()
 
         # Specify the directory where you want to save the files
-        output_directory = "output_directory"
+        output_directory = "."
         os.makedirs(output_directory, exist_ok=True)
 
         # Iterate through the rows and extract files
