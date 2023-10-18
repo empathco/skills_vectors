@@ -10,7 +10,6 @@ env = os.environ['PINECONE_ENV']
 BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
-pinecone.list_indexes()
 # Load the IDs from the CSV file
 ids_path = './data/epl_skill_list_melted.csv'
 ids_df = pd.read_csv(ids_path)

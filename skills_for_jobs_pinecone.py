@@ -3,38 +3,46 @@ import pandas as pd
 import numpy as np
 import time
 
+MAX_JOBS=10
+
+def save_job_skills(job_skills,filename):
+    rows=[]
+    for key,job in job_skills.items():
+        row = {"job":key,"skill1":job['matches'][0]['id'],"skill2":job['matches'][1]['id'],"skill3":job['matches'][2]['id']}
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
 pinecone.api_key = os.environ['PINECONE_API_KEY']
 skill_index_name = 'skills'
 job_index_name = 'jobs'
 env = os.environ['PINECONE_ENV']
-BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
 pinecone.list_indexes()
-# Load the IDs from the CSV file
-ids_path = './data/all_internal_job_title_desc.csv'
-ids_df = pd.read_csv(ids_path)
-ids = ids_df['job_code'].values
+skills_index = pinecone.Index('skills')
+jobs_index = pinecone.Index('jobs')
 
-vectors = np.load('./data/jd_sem_vec.npy')
-num_vectors = vectors.shape[0]
+jobs_path = './data/all_internal_job_title_desc.csv'
+jobs_df = pd.read_csv(jobs_path)
+jobs_vectors = np.load('./data/jd_sem_vec.npy')
 
-# Generate a list of dictionaries for upsert
-upsert_data = [{"id": ids[i], "values": vectors[i].tolist()} for i in range(len(vectors))]
-
-with pinecone.Index(index_name=index_name) as index:
-    first = 0
-    tot_duration = 0
-    while first < num_vectors: 
-        start = time.time()
-        next = first + BATCH_SIZE 
-        print(f"Upserting from {first} to {next} to the {index_name} index.")
-        index.upsert(vectors=upsert_data[first:next],namespace='')
-        first = next
-        end = time.time()
-        duration = end - start
-        print(f"{BATCH_SIZE} vectors uploaded to the {index_name} index in {duration} seconds")
-        tot_duration += duration 
-        
-print(f"{num_vector} vectors uploaded to the {index_name} index in {tot_duration} seconds")
-    
+job_skills={}
+tot_duration = 0 
+num_queries = 0
+for i, job in jobs_df.iterrows():
+    job_vec = jobs_vectors[i]
+    print(f"Finding skills for job {job.loc['job_title']}")
+    start = time.time()
+    result = skills_index.query(vector=job_vec.tolist(),top_k=3,include_values=True)
+    end = time.time()
+    duration = end - start
+    job_skills[job['job_code']]=result
+    print (f"Query time: {duration} seconds")
+    tot_duration += duration 
+    num_queries += 1
+    if i >= MAX_JOBS:
+        break 
+avg_query_time = tot_duration / num_queries
+print(f"Total query time {tot_duration} for {num_queries}, average {avg_query_time}")
+save_job_skills(job_skills,'job_skills.csv')

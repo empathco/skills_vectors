@@ -9,8 +9,7 @@ env = os.environ['PINECONE_ENV']
 BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
-pinecone.list_indexes()
-# Load the IDs from the CSV file
+# Load the unique job IDs (job codes) from the CSV file
 ids_path = './data/all_internal_job_title_desc.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['job_code'].values
