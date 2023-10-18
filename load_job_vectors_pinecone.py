@@ -4,24 +4,22 @@ import numpy as np
 import time
 
 pinecone.api_key = os.environ['PINECONE_API_KEY']
-index_name = 'skills'
-index_name = os.environ['PINECONE_SKILLS_INDEX']
+index_name = 'jobs'
 env = os.environ['PINECONE_ENV']
 BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
 pinecone.list_indexes()
 # Load the IDs from the CSV file
-ids_path = './data/epl_skill_list_melted.csv'
+ids_path = './data/all_internal_job_title_desc.csv'
 ids_df = pd.read_csv(ids_path)
-ids = ids_df['abbreviation'].values
+ids = ids_df['job_code'].values
 
-vectors = np.load('./data/skill_vectors.npy')
+vectors = np.load('./data/jd_sem_vec.npy')
 num_vectors = vectors.shape[0]
 
 # Generate a list of dictionaries for upsert
 upsert_data = [{"id": ids[i], "values": vectors[i].tolist()} for i in range(len(vectors))]
-print(f"{num_vectors} vectors uploading to the '{index_name}' index.")
 
 with pinecone.Index(index_name=index_name) as index:
     first = 0
@@ -38,4 +36,4 @@ with pinecone.Index(index_name=index_name) as index:
         tot_duration += duration 
         
 print(f"{num_vectors} vectors uploaded to the {index_name} index in {tot_duration} seconds")
-   
+    
