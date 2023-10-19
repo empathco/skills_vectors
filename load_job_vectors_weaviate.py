@@ -1,6 +1,7 @@
 import weaviate, os 
 import pandas as pd 
 import numpy as np
+import time
 
 WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
 BATCH_SIZE = 10
@@ -43,7 +44,7 @@ num_vectors = vectors.shape[0]
 
 # Generate a list of dictionaries for upsert
 upsert_data = [{"id": ids[i], "values": vectors[i].tolist()} for i in range(len(vectors))]
- 
+start = time.time()
 with client.batch(batch_size = BATCH_SIZE, callback=cs_check_batch_result) as batch:
     for i,v in enumerate(vectors):
         properties = {
@@ -52,5 +53,7 @@ with client.batch(batch_size = BATCH_SIZE, callback=cs_check_batch_result) as ba
             "jd_plain_text": ids_df['content'][i]
         }
         client.batch.add_data_object(properties,class_name='Job',vector=v)
-
+end = time.time()
+tot_duration = end - start
+print(f"{num_vectors} vectors uploaded in {tot_duration} seconds")
 
