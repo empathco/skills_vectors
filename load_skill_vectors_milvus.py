@@ -1,37 +1,16 @@
-import weaviate, os 
+import os 
 import pandas as pd 
 import numpy as np
 
-WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
-BATCH_SIZE = 10
-
-def cs_check_batch_result(results):
-    """
-    Check batch results for errors.
-    Parameters
-    ----------
-    results : dict
-        The Weaviate batch creation return value.
-    """
-
-    if results is None:
-        return
-    for result in results:
-        if "result" in result and "errors" in result["result"]:
-            if "error" in result["result"]["errors"]:
-                print(result["result"]["errors"])
-                raise Exception(result["result"]["errors"])
-
-resource_owner_config = weaviate.AuthClientPassword(
-        username = os.environ['WEAVIATE_USER'],
-        password = os.environ['WEAVIATE_PASSWORD'],
-        scope = "offline_access" # optional, depends on the configuration of your identity provider (not required with WCS)
-    )
-
-client = weaviate.Client(
-        url = WEAVIATE_SERVER,  
-        auth_client_secret=resource_owner_config
-    )
+from pymilvus import (
+    connections,
+    utility,
+    FieldSchema, CollectionSchema, DataType,
+    Collection,
+)
+token = os.environ['MILVUS_API_KEY']
+uri = os.environ['MILVUS_URL']
+connections.connect("default", uri=uri, token=token)
 
 # Load the IDs from the CSV file
 ids_path = './data/epl_skill_list_melted.csv'
@@ -41,16 +20,18 @@ ids = ids_df['abbreviation'].values
 vectors = np.load('./data/skill_vectors.npy')
 num_vectors = vectors.shape[0]
 
-# Generate a list of dictionaries for upsert
-upsert_data = [{"id": ids[i], "values": vectors[i].tolist()} for i in range(len(vectors))]
- 
-with client.batch(batch_size = BATCH_SIZE, callback=cs_check_batch_result) as batch:
-    for i,v in enumerate(vectors):
-        properties = {
-            "abbreviation": ids_df['abbreviation'][i],
-            "title": ids_df['title'][i],
-            "content": ids_df['content'][i]
-        }
-        client.batch.add_data_object(properties,class_name='Skill',vector=v)
+data=[ids,vectors]
 
+SKILLS_DIM = 512
+fields = [
+    FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=100),
+    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=SKILLS_DIM)
+]
+
+schema = CollectionSchema(fields, "skills")
+
+print(f"Create collection: skills")
+skills_collection = Collection("skills", schema, consistency_level="Strong")
+
+mr = skills_collection.insert(data)
 
