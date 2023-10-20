@@ -4,16 +4,17 @@ import pandas as pd
 import numpy as np
 import time
 
-MAX_JOBS=100
+MAX_JOBS=10
 
 def save_job_skills(job_skills,filename):
     rows=[]
     for key,job in job_skills.items():
-        row = {"job":key,
-               "skill1":job.ids[0],"skill1_score":job.distances[0],
-               "skill2":job.ids[1],"skill2_score":job.distances[1],
-               "skill3":job.ids[2],"skill3_score":job.distances[2],
-            }
+        row = {"job":key}
+        for i in range(len(job.ids)):
+            subkey1 = "skill"+str(i+1)
+            row[subkey1] = job.ids[i]
+            subkey2 = "skill"+str(i+1)+"_score"
+            row[subkey2] = job.distances[i]
         rows.append(row)
     df = pd.DataFrame(rows)
     df.to_csv(filename)
