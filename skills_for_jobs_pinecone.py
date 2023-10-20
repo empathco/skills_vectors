@@ -49,4 +49,4 @@ for i, job in jobs_df.iterrows():
         break 
 avg_query_time = tot_duration / num_queries
 print(f"Total query time {tot_duration} for {num_queries}, average {avg_query_time}")
-save_job_skills(job_skills,'job_skills.csv')
+save_job_skills(job_skills,'job_skills_pinecone.csv')

@@ -35,6 +35,17 @@ jobs_vectors = np.load('./data/jd_sem_vec.npy')
 job_skills={}
 tot_duration = 0 
 num_queries = 0
+skills_collection = Collection("skills")
+print(f"Skills collection: {skills_collection}")
+
+skills_collection.load(replica=2)
+# Check the loading progress and loading status
+utility.load_state("skills")
+# Output: <LoadState: Loaded>
+
+utility.loading_progress("skills")
+# Output: {'loading_progress': 100%}
+
 for i, job in jobs_df.iterrows():
     if i >= MAX_JOBS:
         break 
@@ -46,17 +57,6 @@ for i, job in jobs_df.iterrows():
         "ignore_growing": False, 
         "params": {"nprobe": 10}
     }
-    skills_collection = Collection("skills")
-    print(f"Skills collection: {skills_collection}")
-
-    skills_collection.load(replica=2)
-    # Check the loading progress and loading status
-    utility.load_state("skills")
-    # Output: <LoadState: Loaded>
-
-    utility.loading_progress("skills")
-    # Output: {'loading_progress': 100%}
-    
     start = time.time()
     results = skills_collection.search(
         data=[job_vec], 
@@ -80,4 +80,4 @@ for i, job in jobs_df.iterrows():
 
 avg_query_time = tot_duration / num_queries
 print(f"Total query time {tot_duration} seconds for {num_queries} queries, average {avg_query_time} seconds")
-save_job_skills(job_skills,'job_skills.csv')
+save_job_skills(job_skills,'job_skills_milvus.csv')
