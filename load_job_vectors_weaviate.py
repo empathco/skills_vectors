@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
-BATCH_SIZE = 10
+BATCH_SIZE = 100
 
 def cs_check_batch_result(results):
     """

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import time
 
-MAX_JOBS=10
+MAX_JOBS=100
 
 def save_job_skills(job_skills,filename):
     rows=[]
