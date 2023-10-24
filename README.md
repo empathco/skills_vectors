@@ -1,5 +1,10 @@
 # skills_vectors
-storing and searching skills and jobs vectors in various vector databases
+This project demonstrates storing and searching skills and jobs vectors in various vector databases:
+* Find skills related to job descriptions (semantic search)
+* Uploading to Pinecone, Weaviate, Milvus, Postgres
+* Given a job find related skills using semantic similarity (vector distance)
+* Good broad, “real world complexity” yet replicable test of data loading and semantic search 
+* Code flavor is important for devs (at least for me)
 
 ## Loading Skills Vectors
 
@@ -11,6 +16,12 @@ storing and searching skills and jobs vectors in various vector databases
 
 ### Milvus
     python load_skill_vectors_milvus.py
+
+### pgvector
+    python load_skill_vectors_pg.py
+
+## Performing Semantic Search
+
 
 ## Configure Environment Variables 
 Set the following env vars to access and use the various vector DBs.
