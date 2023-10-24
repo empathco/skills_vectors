@@ -7,6 +7,7 @@ This project demonstrates storing and searching skills and jobs vectors in vario
 * Code flavor is important for devs (at least for me)
 
 ## Loading Skills Vectors
+First load the skills vectors to your DB of choice. 
 
 ### Pinecone
     python3 load_skill_vectors_pinecone.py
@@ -21,7 +22,19 @@ This project demonstrates storing and searching skills and jobs vectors in vario
     python load_skill_vectors_pg.py
 
 ## Performing Semantic Search
+Then perform semantic search with the skills_for_jobs*.py scripts
 
+### Pinecone
+    python3 skills_for_jobs_pinecone.py
+
+### Weaviate
+    python skills_for_jobs_weaviate.py
+
+### Milvus
+    python skills_for_jobs_milvus.py
+
+### pgvector
+    python skills_for_jobs_pg.py
 
 ## Configure Environment Variables 
 Set the following env vars to access and use the various vector DBs.
