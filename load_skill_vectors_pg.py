@@ -5,7 +5,7 @@ import time
 import psycopg2
 import psycopg2.extras as extras
 SKILLS_DIM = 512
-ids_path = './data/epl_skill_list_melted.csv'
+ids_path = './data/epl_skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 vectors = np.load('./data/skill_vectors.npy')
@@ -29,7 +29,6 @@ except (Exception, psycopg2.DatabaseError) as error:
     print("Error: %s" % error)
     conn.rollback()
     cursor.close()
-print("loading done")
 cursor.close()
 end = time.time()
 duration = end - start

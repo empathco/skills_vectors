@@ -6,7 +6,7 @@ import psycopg2
 import psycopg2.extras as extras
 SKILLS_DIM = 512
 # Load the IDs from the CSV file
-ids_path = './data/all_internal_job_title_desc.csv'
+ids_path = './data/job_title_desc.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['job_code'].values
 # load the vectors fron the numpy file

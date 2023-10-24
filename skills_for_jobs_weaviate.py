@@ -31,7 +31,7 @@ client = weaviate.Client(
         auth_client_secret=resource_owner_config
     )
 
-jobs_path = './data/all_internal_job_title_desc.csv'
+jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 jobs_vectors = np.load('./data/jd_sem_vec.npy')
 
@@ -54,7 +54,7 @@ for i, job in jobs_df.iterrows():
         .with_additional(["distance"])
         .do()
     )
-    print(f"Result {result}")
+    #print(f"Result {result}")
     end = time.time()
     duration = end - start
     job_skills[job['job_code']]=result

@@ -14,11 +14,12 @@ uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
 
 # Load the IDs from the CSV file
-ids_path = './data/all_internal_job_title_desc.csv'
+ids_path = './data/job_title_desc.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['job_code'].values
-
+# load the vectors fron the numpy file
 vectors = np.load('./data/jd_and_title_sem_vec.npy')
+
 num_vectors = vectors.shape[0]
 
 data=[ids,vectors]

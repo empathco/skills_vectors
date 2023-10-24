@@ -29,7 +29,7 @@ token = os.environ['MILVUS_API_KEY']
 uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
 
-jobs_path = './data/all_internal_job_title_desc.csv'
+jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 jobs_vectors = np.load('./data/jd_sem_vec.npy')
 

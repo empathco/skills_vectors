@@ -14,7 +14,7 @@ uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
 
 # Load the IDs from the CSV file
-ids_path = './data/epl_skill_list_melted.csv'
+ids_path = './data/epl_skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 vectors = np.load('./data/skill_vectors.npy')

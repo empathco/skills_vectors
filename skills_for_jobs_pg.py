@@ -4,15 +4,15 @@ import pandas as pd
 import numpy as np
 import time
 
-MAX_JOBS=10
+MAX_JOBS=100
 
 def save_job_skills(job_skills,filename):
     rows=[]
     for key in job_skills:
         row = {"job":key}
-        print(f"Job key {key}")
+        #print(f"Job key {key}")
         skills= job_skills[key]
-        print(f"Skills {skills}")
+        #print(f"Skills {skills}")
         for i in range(len(skills)):
             subkey1 = "skill"+str(i+1)
             row[subkey1] = skills[i][0]
@@ -22,7 +22,7 @@ def save_job_skills(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-jobs_path = './data/all_internal_job_title_desc.csv'
+jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 jobs_vectors = np.load('./data/jd_sem_vec.npy')
 
@@ -46,10 +46,9 @@ for i, job in jobs_df.iterrows():
     job_vec = jobs_vectors[i]
     vec_list = job_vec.tolist()
     vec_str =  ", ".join(str(num) for num in vec_list)
-    print(f"Vector string {vec_str}")
     print(f"Finding skills for job {job.loc['job_title']}")
     query = "SELECT abbreviation, embedding <=> '[" + vec_str +"]' AS score FROM skills ORDER BY score DESC LIMIT 3"
-    print(f"Query {query}")
+    #print(f"Query {query}")
     start = time.time()
     cursor.execute(query)
     skills = cursor.fetchall()
@@ -59,7 +58,7 @@ for i, job in jobs_df.iterrows():
 
     tot_duration += duration 
     num_queries += 1
-    print(f"Skills {skills}")
+    #print(f"Skills {skills}")
     job_skills[job['job_code']]=skills
 cursor.close()
 conn.close()

@@ -26,7 +26,7 @@ pinecone.init(api_key=pinecone.api_key, environment = env)
 skills_index = pinecone.Index('skills')
 jobs_index = pinecone.Index('jobs')
 
-jobs_path = './data/all_internal_job_title_desc.csv'
+jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 jobs_vectors = np.load('./data/jd_sem_vec.npy')
 
