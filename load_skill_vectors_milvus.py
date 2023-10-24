@@ -37,11 +37,12 @@ index_params = {
   "metric_type":"L2",
   "index_type":"IVF_FLAT",
   "params":{"nlist":1024}
-}     
-collection.create_index(
-  field_name="embeddings", 
-  index_params=index_params
-)
+} 
+# don't need to recreate index here    
+#collection.create_index(
+#  field_name="embeddings", 
+#  index_params=index_params
+#)
 print(f"Result of data insert: {result}")
 end = time.time()
 tot_duration = end - start

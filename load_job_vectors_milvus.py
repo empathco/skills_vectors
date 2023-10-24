@@ -11,6 +11,10 @@ from pymilvus import (
 )
 token = os.environ['MILVUS_API_KEY']
 uri = os.environ['MILVUS_URL']
+#just API key at Starter level, token = os.environ['MILVUS_API_KEY']
+# this is how you connect with Standard (not Starter) level
+token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
+uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
 
 # Load the IDs from the CSV file
