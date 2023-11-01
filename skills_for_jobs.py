@@ -5,7 +5,7 @@ import time
 
 MAX_JOBS=10
 TARGET_ORG='wg'
-MAX_SKILLS=100
+MAX_SKILLS=10
 WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
 
 labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
@@ -26,10 +26,13 @@ def save_job_skills_pinecone(job_skills,filename):
     for key,job in job_skills.items():
         count = 0 
         row = {"job":key}
-        for i in range(MAX_SKILLS):
+        prev_skill = None 
+        for i in range(len(job['matches'])):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
                 value = row["skill"+str(i)]=job['matches'][i]['id']
+                if value == prev_skill:
+                    continue
                 if job_has_skill(key,value):
                     count += 1
         row["quality"] = count 
@@ -48,8 +51,11 @@ def save_job_skills_weaviate(job_skills,filename):
         row = {"job":key}
         skills=job['data']['Get']['Skill']
         i=0
+        prev_skill = None
         for skill in skills:
             value = row["skill"+str(i)]=skill['abbreviation'] 
+            if value == prev_skill:
+                continue
             i+=1 
             if job_has_skill(key,value):
                 count += 1
@@ -100,7 +106,7 @@ for i, job in jobs_df.iterrows():
     # pinecone search
     #print(f"Finding skills for job {job.loc['job_title']}")
     start = time.time()
-    result = pinecone_skills_index.query(vector=job_vec.tolist(),top_k=MAX_JOBS,include_values=True)
+    result = pinecone_skills_index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS*5,include_values=True)
     #print(f"Result {result}")
     end = time.time()
     duration = end - start
@@ -115,7 +121,7 @@ for i, job in jobs_df.iterrows():
         .with_near_vector({
             "vector": job_vec
         })
-        .with_limit(MAX_SKILLS)
+        .with_limit(MAX_SKILLS*5)
         .with_additional(["distance"])
         .do()
     )
@@ -124,12 +130,13 @@ for i, job in jobs_df.iterrows():
     duration = end - start
     job_skills_weaviate[job['job_title']]=result
     print (f"Query time Weaviate: {duration} seconds")
+    tot_durations['weaviate'] += duration 
 
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Total query time {tot_durations['pinecone']}, average {avg_query_time}")
 save_job_skills_pinecone(job_skills_pinecone,'job_skills_pinecone.csv')
 
-avg_query_time = tot_durations['pinecone'] / len(job_skills_weaviate)
+avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Total query time {tot_durations['weaviate']}, average {avg_query_time}")
 save_job_skills_weaviate(job_skills_weaviate,'job_skills_weaviate.csv')
 
