@@ -30,22 +30,30 @@ fields = [
 schema = CollectionSchema(fields, "skills")
 print(f"Create collection: skills")
 skills_collection = Collection("skills", schema, consistency_level="Strong")
+tot_duration = 0
 start = time.time()
 result = skills_collection.insert(data)
-collection = Collection("skills") 
+end = time.time() 
+duration = end - start
+tot_duration += duration 
+print(f"Result of data insert: {result} in {duration} seconds") 
+
+# creating index
+start = time.time()
 index_params = {
   "metric_type":"L2",
-  "index_type":"IVF_FLAT",
-  "params":{"nlist":1024}
+  "index_type":"DISKANN",
+  "params":{}
 } 
-# don't need to recreate index here    
-#collection.create_index(
-#  field_name="embeddings", 
-#  index_params=index_params
-#)
-print(f"Result of data insert: {result}")
+skills_collection.create_index(
+    field_name="embeddings", 
+  index_params=index_params
+)
+result = utility.index_building_progress("skills")
 end = time.time()
-tot_duration = end - start
+duration = end - start 
+print(f"Result of index creation: {result} in {duration} seconds") 
+tot_duration += duration 
 
 print(f"{num_vectors} vectors uploaded in {tot_duration} seconds")
 

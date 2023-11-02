@@ -2,13 +2,17 @@ import pinecone, weaviate, os
 import pandas as pd 
 import numpy as np
 import time
+from pymilvus import (
+    connections,
+    utility,
+    FieldSchema, CollectionSchema, DataType,
+    Collection,
+)
 
 MAX_JOBS=10
 TARGET_ORG='wg'
 MAX_SKILLS=10
 WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
-
-labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
 
 def job_has_skill(job_title,skill_id):
     #print(f"Looking for skills for job {job_title} to match {skill_id} ")
@@ -67,6 +71,28 @@ def save_job_skills_weaviate(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
+def save_job_skills_milvus(job_skills,filename):
+    rows=[]
+    tot_quality = 0
+    for key,job in job_skills.items():
+        row = {"job":key}
+        i=0
+        count = 0 
+        #print(f"Job: {job}")
+        for id in job.ids:
+            value = row["skill"+str(i+1)] = id
+            i+=1
+            if job_has_skill(key,value):
+                count += 1
+        row["quality"] = count 
+        tot_quality += count 
+        rows.append(row)
+    avg_quality = tot_quality/len(job_skills)
+    print(f"Average quality {avg_quality}")
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
+
 pinecone.api_key = os.environ['PINECONE_API_KEY']
 skill_index_name = 'skills'
 job_index_name = 'jobs'
@@ -86,16 +112,29 @@ weaviate_client = weaviate.Client(
         auth_client_secret=resource_owner_config
     )
 
+token = os.environ['MILVUS_API_KEY']
+uri = os.environ['MILVUS_URL']
+token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
+uri = os.environ['MILVUS_URL']
+connections.connect("default", uri=uri, token=token)
+# TODO: create the Milvus index via API if it doesn't exist yet
+
+skills_collection = Collection("skills")
+
+labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
+
 jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 if (jobs_df.size == 0) or (jobs_df[jobs_df['org_name']==TARGET_ORG].size==0):
-    print ("No jobs")
+    print ("No jobs are available.")
     exit()
 jobs_vectors = np.load('./data/jd_sem_vec.npy')
 
-job_skills_pinecone={}
-job_skills_weaviate={}
+job_skills_pinecone = {}
+job_skills_weaviate = {}
+job_skills_milvus = {}
 tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':'0'}
+
 for i, job in jobs_df.iterrows():
     if job['org_name']!=TARGET_ORG: 
         continue
@@ -113,7 +152,8 @@ for i, job in jobs_df.iterrows():
     job_skills_pinecone[job['job_title']]=result
     print (f"Query time Pinecone: {duration} seconds")
     tot_durations['pinecone'] += duration 
-
+    ##############################
+    # weaviate search
     start = time.time()
     result = (
         weaviate_client.query
@@ -132,6 +172,36 @@ for i, job in jobs_df.iterrows():
     print (f"Query time Weaviate: {duration} seconds")
     tot_durations['weaviate'] += duration 
 
+    ##############################
+    # milvus search 
+    search_params = {
+        "metric_type": "L2", 
+        "offset": 5, 
+        "ignore_growing": False, 
+        "params": {"nprobe": 10}
+    }
+    start = time.time()
+    milvus_result = skills_collection.search(
+        data=[job_vec], 
+        anns_field="embeddings",
+        # the sum of `offset` in `param` and `limit` 
+        # should be less than 16384.
+        param=search_params,
+        limit=MAX_SKILLS,
+        expr=None,
+        # set the names of the fields you want to 
+        # retrieve from the search result.
+        output_fields=['id'],
+        consistency_level="Strong"
+    ) 
+    end = time.time()
+    duration = end - start
+    job_skills_milvus[job['job_title']]=milvus_result[0]
+    print (f"Query time Milvus: {duration} seconds")
+    tot_durations['milvus'] += duration 
+
+
+# report on the search times
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Total query time {tot_durations['pinecone']}, average {avg_query_time}")
 save_job_skills_pinecone(job_skills_pinecone,'job_skills_pinecone.csv')
@@ -139,4 +209,9 @@ save_job_skills_pinecone(job_skills_pinecone,'job_skills_pinecone.csv')
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Total query time {tot_durations['weaviate']}, average {avg_query_time}")
 save_job_skills_weaviate(job_skills_weaviate,'job_skills_weaviate.csv')
+
+avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
+print(f"Total query time {tot_durations['milvus']}, average {avg_query_time}")
+save_job_skills_milvus(job_skills_milvus,'job_skills_milvus.csv')
+
 
