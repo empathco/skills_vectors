@@ -9,71 +9,10 @@ from pymilvus import (
     Collection,
 )
 
-MAX_JOBS=10
+MAX_JOBS=100
 TARGET_ORG='wg'
 MAX_SKILLS=10
-WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
 
-def job_has_skill(job_title,skill_id):
-    #print(f"Looking for skills for job {job_title} to match {skill_id} ")
-    for i,skill in labeled_job_skills.loc[labeled_job_skills['job_title']==job_title].iterrows():
-        #print(f"Does skill {skill['abbreviation']}={skill_id}?")
-        if skill['abbreviation']==skill_id:
-            #print(f"Found abbreviation")
-            return True 
-    #print("Didn't find abbreviation")
-    return False
-
-def save_job_skills_pinecone(job_skills,filename):
-    rows=[]
-    tot_quality=0
-    for key,job in job_skills.items():
-        count = 0 
-        row = {"job":key}
-        prev_skill = None 
-        for i in range(len(job['matches'])):
-            #print(f"Matches {job['matches']}")
-            if i< len(job['matches']):
-                value = row["skill"+str(i)]=job['matches'][i]['id']
-                if value == prev_skill:
-                    continue
-                if job_has_skill(key,value):
-                    count += 1
-        row["quality"] = count 
-        tot_quality += count 
-        rows.append(row)
-    avg_quality = tot_quality/len(job_skills)
-    print(f"Average quality {avg_quality}")
-    df = pd.DataFrame(rows)
-    df.to_csv(filename)
-
-def save_job_skills_weaviate(job_skills,filename):
-    rows=[]
-    tot_quality=0
-    #print(f"Looping through {len(job_skills)} items")
-    for key,job in job_skills.items():
-        count=0
-        row = {"job":key}
-        #print(f"Job {job}")
-        skills=job['data']['Get']['Skill']
-        i=0
-        prev_skill = None
-        for skill in skills:
-            value = row["skill"+str(i)]=skill['abbreviation'] 
-            if value == prev_skill:
-                continue
-            i+=1 
-            if job_has_skill(key,value):
-                count += 1
-        row["quality"] = count 
-        tot_quality += count 
-        rows.append(row)
-    avg_quality = tot_quality/len(job_skills)
-    print(f"Average quality {avg_quality}")
-    df = pd.DataFrame(rows)
-    df.to_csv(filename)
-
-import json 
 def save_job_skills_milvus(job_skills,filename):
     rows=[]
     tot_quality = 0
@@ -111,6 +50,7 @@ def init_pinecone():
     return index
 
 def init_weaviate():
+    WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
     resource_owner_config = weaviate.AuthClientPassword(
         username = os.environ['WEAVIATE_USER'],
         password = os.environ['WEAVIATE_PASSWORD'],
@@ -192,6 +132,65 @@ def milvus_search(collection,job_vec):
     #print(f"Milvus result {results}")
     return result 
 
+def job_has_skill(job_title,skill_id):
+    #print(f"Looking for skills for job {job_title} to match {skill_id} ")
+    for i,skill in labeled_job_skills.loc[labeled_job_skills['job_title']==job_title].iterrows():
+        #print(f"Does skill {skill['abbreviation']}={skill_id}?")
+        if skill['abbreviation']==skill_id:
+            #print(f"Found abbreviation")
+            return True 
+    #print("Didn't find abbreviation")
+    return False
+
+def save_job_skills_pinecone(job_skills,filename):
+    rows=[]
+    tot_quality=0
+    for key,job in job_skills.items():
+        count = 0 
+        row = {"job":key}
+        prev_skill = None 
+        for i in range(len(job['matches'])):
+            #print(f"Matches {job['matches']}")
+            if i< len(job['matches']):
+                value = row["skill"+str(i)]=job['matches'][i]['id']
+                if value == prev_skill:
+                    continue
+                if job_has_skill(key,value):
+                    count += 1
+        row["quality"] = count 
+        tot_quality += count 
+        rows.append(row)
+    avg_quality = tot_quality/len(job_skills)
+    print(f"Average quality {avg_quality}")
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
+def save_job_skills_weaviate(job_skills,filename):
+    rows=[]
+    tot_quality=0
+    #print(f"Looping through {len(job_skills)} items")
+    for key,job in job_skills.items():
+        count=0
+        row = {"job":key}
+        #print(f"Job {job}")
+        skills=job['data']['Get']['Skill']
+        i=0
+        prev_skill = None
+        for skill in skills:
+            value = row["skill"+str(i)]=skill['abbreviation'] 
+            if value == prev_skill:
+                continue
+            i+=1 
+            if job_has_skill(key,value):
+                count += 1
+        row["quality"] = count 
+        tot_quality += count 
+        rows.append(row)
+    avg_quality = tot_quality/len(job_skills)
+    print(f"Average quality {avg_quality}")
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
 jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 if (jobs_df.size == 0) or (jobs_df[jobs_df['org_name']==TARGET_ORG].size==0):
@@ -220,15 +219,15 @@ for i, job in jobs_df.iterrows():
 # save the job skills alignments and report on the search times and quality
 labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
-print(f"Total query time {tot_durations['pinecone']}, average {avg_query_time}")
+print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}")
 save_job_skills_pinecone(job_skills_pinecone,'job_skills_pinecone.csv')
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
-print(f"Total query time {tot_durations['weaviate']}, average {avg_query_time}")
+print(f"Weaviate: total query time {tot_durations['weaviate']}, average {avg_query_time}")
 save_job_skills_weaviate(job_skills_weaviate,'job_skills_weaviate.csv')
 
 avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
-print(f"Total query time {tot_durations['milvus']}, average {avg_query_time}")
+print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
 save_job_skills_milvus(job_skills_milvus,'job_skills_milvus.csv')
 
 
