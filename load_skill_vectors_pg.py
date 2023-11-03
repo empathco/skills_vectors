@@ -19,6 +19,8 @@ conn = psycopg2.connect(database=db_name,
                         user=db_user,
                         password=db_password)
 cursor = conn.cursor()
+
+# search for skills
 start = time.time()
 try:
     for i,row in ids_df.iterrows():
@@ -28,8 +30,20 @@ try:
 except (Exception, psycopg2.DatabaseError) as error:
     print("Error: %s" % error)
     conn.rollback()
-    cursor.close()
-cursor.close()
 end = time.time()
 duration = end - start
 print(f"{num_vectors} vectors uploaded in {duration} seconds")
+
+# create index for skills
+start = time.time()
+try:
+    cmd = "CREATE INDEX IF NOT EXISTS SKILLS_INDEX ON SKILLS USING ivfflat (embedding vector_cosine_ops) WITH (lists = 4);"
+    cursor.execute(cmd)  
+    conn.commit()
+except (Exception, psycopg2.DatabaseError) as error:
+    print("Error: %s" % error)
+    conn.rollback()
+end = time.time()
+duration = end - start
+print(f"Index created in {duration} seconds")
+cursor.close()
