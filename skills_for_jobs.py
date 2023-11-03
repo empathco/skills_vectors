@@ -1,4 +1,4 @@
-import pinecone, weaviate, os 
+import pinecone, weaviate, psycopg2, os 
 import pandas as pd 
 import numpy as np
 import time
@@ -9,37 +9,9 @@ from pymilvus import (
     Collection,
 )
 
-MAX_JOBS=100
+MAX_JOBS=10
 TARGET_ORG='wg'
 MAX_SKILLS=10
-
-def save_job_skills_milvus(job_skills,filename):
-    rows=[]
-    tot_quality = 0
-    for key,job in job_skills.items():
-        row = {"job":key}
-        i=0
-        count = 0 
-        #print(f"Job: {job}")
-        if job is None:
-            break 
-        for hit in job:
-            if hit is None: 
-                break
-            if hit: 
-                #print(f"Hit {hit}")
-                value = row["skill"+str(i+1)] = hit.id
-                i+=1
-                if job_has_skill(key,value):
-                    count += 1
-        row["quality"] = count 
-        tot_quality += count 
-        rows.append(row)
-    avg_quality = tot_quality/len(job_skills)
-    print(f"Average quality {avg_quality}")
-    df = pd.DataFrame(rows)
-    df.to_csv(filename)
-
 
 def init_pinecone():
     pinecone.api_key = os.environ['PINECONE_API_KEY']
@@ -61,6 +33,18 @@ def init_weaviate():
         auth_client_secret=resource_owner_config
     )
     return client 
+
+def init_pg():
+    host = os.environ['STACKHERO_POSTGRESQL_HOST']
+    db_name = "skills_vectors"
+    db_user = "admin"
+    db_password = os.environ['STACKHERO_POSTGRESQL_ADMIN_PASSWORD']
+    conn = psycopg2.connect(database=db_name,
+                            host=host,
+                            user=db_user,
+                            password=db_password)
+    cursor = conn.cursor()
+    return cursor 
 
 def init_milvus():
     token = os.environ['MILVUS_API_KEY']
@@ -132,6 +116,21 @@ def milvus_search(collection,job_vec):
     #print(f"Milvus result {results}")
     return result 
 
+def pg_search(cursor,job_vec):
+    vec_list = job_vec.tolist()
+    vec_str =  ",".join(str(num) for num in vec_list)
+    #print(f"Finding skills for job {job.loc['job_title']}")
+    query = "SELECT abbreviation, embedding <=> '[" + vec_str +"]' AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
+    #print(f"Query {query}")
+    start = time.time()
+    cursor.execute(query)
+    skills = cursor.fetchall()
+    end = time.time()
+    duration = end - start
+    print(f"Query time Postgres: {duration} seconds")
+    tot_durations['pg'] += duration
+    return skills 
+
 def job_has_skill(job_title,skill_id):
     #print(f"Looking for skills for job {job_title} to match {skill_id} ")
     for i,skill in labeled_job_skills.loc[labeled_job_skills['job_title']==job_title].iterrows():
@@ -191,6 +190,46 @@ def save_job_skills_weaviate(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
+def save_job_skills_milvus(job_skills,filename):
+    rows=[]
+    tot_quality = 0
+    for key,job in job_skills.items():
+        row = {"job":key}
+        i=0
+        count = 0 
+        #print(f"Job: {job}")
+        if job is None:
+            break 
+        for hit in job:
+            if hit is None: 
+                break
+            if hit: 
+                #print(f"Hit {hit}")
+                value = row["skill"+str(i+1)] = hit.id
+                i+=1
+                if job_has_skill(key,value):
+                    count += 1
+        row["quality"] = count 
+        tot_quality += count 
+        rows.append(row)
+    avg_quality = tot_quality/len(job_skills)
+    print(f"Average quality {avg_quality}")
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
+def save_job_skills_pg(job_skills,filename):
+    rows=[]
+    for key,job in job_skills.items():
+        row = {"job":key}
+        skills=job_skills[key]
+        i=0
+        for skill in job:
+            row["skill"+str(i)] = skill[0]
+            i+=1
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)
+
 jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
 if (jobs_df.size == 0) or (jobs_df[jobs_df['org_name']==TARGET_ORG].size==0):
@@ -201,11 +240,13 @@ jobs_vectors = np.load('./data/jd_sem_vec.npy')
 job_skills_pinecone = {}
 job_skills_weaviate = {}
 job_skills_milvus = {}
-tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':'0'}
+job_skills_pg = {}
+tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':0}
 
 pinecone_skills_index = init_pinecone() 
 weaviate_client = init_weaviate()
 milvus_collection = init_milvus()
+pg_cursor = init_pg() 
 for i, job in jobs_df.iterrows():
     if job['org_name']!=TARGET_ORG: 
         continue
@@ -215,6 +256,7 @@ for i, job in jobs_df.iterrows():
     job_skills_pinecone[job['job_title']] = pinecone_search(pinecone_skills_index,job_vec)
     job_skills_weaviate[job['job_title']] = weaviate_search(weaviate_client,job_vec)
     job_skills_milvus[job['job_title']] = milvus_search(milvus_collection,job_vec)
+    job_skills_pg[job['job_title']] = pg_search(pg_cursor,job_vec)   
 
 # save the job skills alignments and report on the search times and quality
 labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
@@ -230,4 +272,6 @@ avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
 print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
 save_job_skills_milvus(job_skills_milvus,'job_skills_milvus.csv')
 
-
+avg_query_time = tot_durations['pg'] / len(job_skills_pg)
+print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
+save_job_skills_milvus(job_skills_milvus,'job_skills_pg.csv')
