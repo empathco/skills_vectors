@@ -5,6 +5,7 @@ import time
 import psycopg2
 import psycopg2.extras as extras
 SKILLS_DIM = 512
+NUM_LISTS = 4 
 ids_path = './data/epl_skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
@@ -37,7 +38,7 @@ print(f"{num_vectors} vectors uploaded in {duration} seconds")
 # create index for skills
 start = time.time()
 try:
-    cmd = "CREATE INDEX IF NOT EXISTS SKILLS_INDEX ON SKILLS USING ivfflat (embedding vector_cosine_ops) WITH (lists = 4);"
+    cmd = "CREATE INDEX IF NOT EXISTS SKILLS_INDEX ON SKILLS USING ivfflat (embedding vector_cosine_ops) WITH (lists = "+ str(NUM_LISTS) + ");"
     cursor.execute(cmd)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:

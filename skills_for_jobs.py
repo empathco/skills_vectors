@@ -9,9 +9,10 @@ from pymilvus import (
     Collection,
 )
 
-MAX_JOBS=10
-TARGET_ORG='wg'
-MAX_SKILLS=10
+MAX_JOBS = 100
+TARGET_ORG = 'wg'
+MAX_SKILLS = 10
+NUM_LISTS = 4
 
 def init_pinecone():
     pinecone.api_key = os.environ['PINECONE_API_KEY']
@@ -131,17 +132,7 @@ def pg_search(cursor,job_vec):
     tot_durations['pg'] += duration
     return skills 
 
-def job_has_skill(job_title,skill_id):
-    #print(f"Looking for skills for job {job_title} to match {skill_id} ")
-    for i,skill in labeled_job_skills.loc[labeled_job_skills['job_title']==job_title].iterrows():
-        #print(f"Does skill {skill['abbreviation']}={skill_id}?")
-        if skill['abbreviation']==skill_id:
-            #print(f"Found abbreviation")
-            return True 
-    #print("Didn't find abbreviation")
-    return False
-
-def save_job_skills_pinecone(job_skills,filename):
+def save_job_skills_pinecone(job_skills,best_skills,filename):
     rows=[]
     tot_quality=0
     for key,job in job_skills.items():
@@ -154,7 +145,8 @@ def save_job_skills_pinecone(job_skills,filename):
                 value = row["skill"+str(i)]=job['matches'][i]['id']
                 if value == prev_skill:
                     continue
-                if job_has_skill(key,value):
+                if value in best_skills:
+                    print(f"{value} is one of best matches")
                     count += 1
         row["quality"] = count 
         tot_quality += count 
@@ -164,7 +156,7 @@ def save_job_skills_pinecone(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_weaviate(job_skills,filename):
+def save_job_skills_weaviate(job_skills,best_skills,filename):
     rows=[]
     tot_quality=0
     #print(f"Looping through {len(job_skills)} items")
@@ -180,7 +172,8 @@ def save_job_skills_weaviate(job_skills,filename):
             if value == prev_skill:
                 continue
             i+=1 
-            if job_has_skill(key,value):
+            if value in best_skills:
+                print("Found skill match")
                 count += 1
         row["quality"] = count 
         tot_quality += count 
@@ -190,7 +183,7 @@ def save_job_skills_weaviate(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_milvus(job_skills,filename):
+def save_job_skills_milvus(job_skills,best_skills,filename):
     rows=[]
     tot_quality = 0
     for key,job in job_skills.items():
@@ -207,7 +200,8 @@ def save_job_skills_milvus(job_skills,filename):
                 #print(f"Hit {hit}")
                 value = row["skill"+str(i+1)] = hit.id
                 i+=1
-                if job_has_skill(key,value):
+                if value in best_skills:
+                    print("Found skill match")
                     count += 1
         row["quality"] = count 
         tot_quality += count 
@@ -217,18 +211,52 @@ def save_job_skills_milvus(job_skills,filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_pg(job_skills,filename):
+def save_job_skills_pg(job_skills,best_skills,filename):
     rows=[]
     for key,job in job_skills.items():
         row = {"job":key}
         skills=job_skills[key]
         i=0
-        for skill in job:
-            row["skill"+str(i)] = skill[0]
+        for skill in skills:
+            value = row["skill"+str(i)] = skill[0]
             i+=1
+            if value in best_skills:
+                print("Found skill match")
+                count += 1
+        row["quality"] = count 
+        tot_quality += count 
         rows.append(row)
+    avg_quality = tot_quality/len(job_skills)
+    print(f"Average quality {avg_quality}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
+
+# use the Postgres exact nearest neighbor search to find the "right" answers 
+# to evaluate the index Approximate Nearest Neighbor accuracy
+def get_nearest_neighbor_skills(cursor,job_vec):
+    vec_list = job_vec.tolist()
+    vec_str =  ",".join(str(num) for num in vec_list)
+    #print(f"Finding skills for job {job.loc['job_title']}")
+    # setting probes to the numnber of lists forces Exact Nearest Neighbor search
+    query = "BEGIN;SET LOCAL ivfflat.probes = "+str(NUM_LISTS)+";"
+    query += "SELECT abbreviation, embedding <=> '[" + vec_str +"]' AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
+    #query += ";COMMIT;"
+    #print(f"Query {query}")
+    start = time.time()
+    cursor.execute(query)
+    results = cursor.fetchall()
+    end = time.time()
+    nn_skills = []
+    for result in results:
+        if (len(nn_skills)>0) and result[0]==nn_skills[-1]:
+            continue
+        nn_skills.append(result[0])
+    duration = end - start
+    print(f"Query time Postgres: {duration} seconds")
+    cursor.execute("COMMIT")
+    tot_durations['pg'] += duration
+    print(f"Best skills: {nn_skills}")
+    return nn_skills 
 
 jobs_path = './data/job_title_desc.csv'
 jobs_df = pd.read_csv(jobs_path)
@@ -247,31 +275,31 @@ pinecone_skills_index = init_pinecone()
 weaviate_client = init_weaviate()
 milvus_collection = init_milvus()
 pg_cursor = init_pg() 
+
 for i, job in jobs_df.iterrows():
     if job['org_name']!=TARGET_ORG: 
         continue
-    job_vec = jobs_vectors[i]
     if len(job_skills_pinecone)>=MAX_JOBS:
         break
+    job_vec = jobs_vectors[i]
+    best_skills = get_nearest_neighbor_skills(pg_cursor,job_vec) 
     job_skills_pinecone[job['job_title']] = pinecone_search(pinecone_skills_index,job_vec)
     job_skills_weaviate[job['job_title']] = weaviate_search(weaviate_client,job_vec)
     job_skills_milvus[job['job_title']] = milvus_search(milvus_collection,job_vec)
-    job_skills_pg[job['job_title']] = pg_search(pg_cursor,job_vec)   
+    job_skills_pg[job['job_title']] = pg_search(pg_cursor,job_vec)  
 
-# save the job skills alignments and report on the search times and quality
-labeled_job_skills = pd.read_csv('./data/labeled_job_skills.csv')
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}")
-save_job_skills_pinecone(job_skills_pinecone,'job_skills_pinecone.csv')
+save_job_skills_pinecone(job_skills_pinecone,best_skills,'job_skills_pinecone.csv')
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Weaviate: total query time {tot_durations['weaviate']}, average {avg_query_time}")
-save_job_skills_weaviate(job_skills_weaviate,'job_skills_weaviate.csv')
+save_job_skills_weaviate(job_skills_weaviate,best_skills,'job_skills_weaviate.csv')
 
 avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
 print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
-save_job_skills_milvus(job_skills_milvus,'job_skills_milvus.csv')
+save_job_skills_milvus(job_skills_milvus,best_skills,'job_skills_milvus.csv')
 
 avg_query_time = tot_durations['pg'] / len(job_skills_pg)
 print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
-save_job_skills_milvus(job_skills_milvus,'job_skills_pg.csv')
+save_job_skills_milvus(job_skills_milvus,best_skills,'job_skills_pg.csv')
