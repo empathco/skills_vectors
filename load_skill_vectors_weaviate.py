@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import time
 
-WEAVIATE_SERVER='https://skills-322ahpq1.weaviate.network'
+WEAVIATE_SERVER=os.environ['WEAVIATE_CLUSTER']
 BATCH_SIZE = 100
 
 def cs_check_batch_result(results):
