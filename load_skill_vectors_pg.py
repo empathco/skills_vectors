@@ -6,11 +6,11 @@ import psycopg2
 import psycopg2.extras as extras
 SKILLS_DIM = 512
 NUM_LISTS = 4 
-ids_path = './data/epl_skill_list.csv'
+ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 vectors = np.load('./data/skill_vectors.npy')
-print(f"Shape of skill_vectors.npy {vectors.shape}")
+#print(f"Shape of skill_vectors.npy {vectors.shape}")
 num_vectors = vectors.shape[0]
 host = os.environ['STACKHERO_POSTGRESQL_HOST']
 db_name = "skills_vectors"

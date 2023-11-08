@@ -12,7 +12,6 @@ from pymilvus import (
     FieldSchema, CollectionSchema, DataType,
     Collection,
 )
-from scipy.spatial import distance
 
 MAX_JOBS = 100
 TARGET_ORG = 'wg'

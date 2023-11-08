@@ -11,7 +11,7 @@ BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
 # Load the IDs from the CSV file
-ids_path = './data/epl_skill_list.csv'
+ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 
