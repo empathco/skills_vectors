@@ -13,7 +13,7 @@ from pymilvus import (
     Collection,
 )
 
-MAX_JOBS = 1000
+MAX_JOBS = 5000 # all jobs
 TARGET_ORG = 'wg'
 MAX_SKILLS = 10
 NUM_LISTS = 4
@@ -65,7 +65,7 @@ def init_milvus():
 
 def pinecone_search(index,job_vec):
     start = time.time()
-    result = index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS*5,include_values=True)
+    result = index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS*5,include_values=True,include_metadata=True)
     #print(f"Result {result}")
     end = time.time()
     duration = end - start
@@ -79,16 +79,22 @@ def weaviate_search(client,job_vec):
     if len(job_skills_weaviate)>=MAX_JOBS:
         return None 
     start = time.time()
-    result = (
-        client.query
-        .get("Skill", ["abbreviation", "title","level"])
-        .with_near_vector({
-            "vector": job_vec
-        })
-        .with_limit(MAX_SKILLS*5)
-        .with_additional(["distance","vector"])
-        .do()
-    )
+    result = None 
+    try: 
+        result = (
+            client.query
+            .get("Skill", ["abbreviation", "title","level"])
+            .with_near_vector({
+                "vector": job_vec
+            })
+            .with_limit(MAX_SKILLS*5)
+            .with_additional(["distance","vector"])
+            .do()
+        )
+    except Exception as e:
+        print(f"Query failed: {e}")
+        errors+=1
+
     end = time.time()
     duration = end - start
     job_skills_weaviate[job['job_title']]=result
@@ -122,7 +128,6 @@ def milvus_search(collection,job_vec):
     result=results[0]
     print (f"Query time Milvus: {duration} seconds")
     tot_durations['milvus'] += duration 
-    #print(f"Milvus result {results}")
     return result 
 
 def pg_search(cursor,job_vec):
@@ -147,7 +152,7 @@ def average(lst):
     return sum(lst) / len(lst) 
 
 def save_job_skills_pinecone(job_skills,best_skills,best_vector,filename):
-    print(f"Pinecone: evaluating {len(job_skills)} skills")
+    #print(f"Pinecone: evaluating {len(job_skills)} skills")
     rows=[]
     tot_quality=0
 
@@ -161,7 +166,7 @@ def save_job_skills_pinecone(job_skills,best_skills,best_vector,filename):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
                 value = row["skill"+str(i)]=job['matches'][i]['id']
-                row["level"+str(i)]=job['matches'][i]['level']
+                row["level"+str(i)]=job['matches'][i]['metadata']['level']
                 if value == prev_skill:
                     continue
                 if value in best_skills:
@@ -229,9 +234,8 @@ def save_job_skills_milvus(job_skills,best_skills,best_vector,filename):
         for hit in job:
             if hit is None: 
                 break
-            #print(f"Hit {hit.entity}")
-            value = row["skill"+str(i)] = hit.id
-            row["level"+str(i)]=hit.level 
+            value = row["skill"+str(i)] = hit.entity.id
+            row["level"+str(i)]=hit.entity.get('level')
             i+=1
             if value in best_skills:
                 #print("Found skill match")
@@ -264,7 +268,8 @@ def save_job_skills_pg(job_skills,best_skills,best_vector,filename):
             if value in best_skills:
                 #print("Found skill match")
                 count += 1
-            similarities.append(cos_sim(np.array(ast.literal_eval(skill[2])),best_vector))
+            similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
+        print(f"Average similarities: {average(similarities)}")
         avg_similarities.append(average(similarities))
         row["quality"] = count 
         tot_quality += count 
@@ -323,7 +328,7 @@ pinecone_skills_index = init_pinecone()
 weaviate_client = init_weaviate()
 milvus_collection = init_milvus()
 pg_cursor = init_pg() 
-
+pinecone_errors = 0 
 for i, job in jobs_df.iterrows():
     if job['org_name']!=TARGET_ORG: 
         continue
@@ -331,14 +336,20 @@ for i, job in jobs_df.iterrows():
         break
     job_vec = jobs_vectors[i]
 
-    job_skills_pinecone[job['job_title']] = pinecone_search(pinecone_skills_index,job_vec)
+    result = pinecone_search(pinecone_skills_index,job_vec)
+    if result is None:
+        print("No result from Pinecone search")
+        pinecone_errors+=1
+    else: 
+        job_skills_pinecone[job['job_title']] = result
+
     job_skills_weaviate[job['job_title']] = weaviate_search(weaviate_client,job_vec)
     job_skills_milvus[job['job_title']] = milvus_search(milvus_collection,job_vec)
     job_skills_pg[job['job_title']] = pg_search(pg_cursor,job_vec)  
     best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec) 
 
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
-print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}")
+print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}, error count {pinecone_errors}")
 save_job_skills_pinecone(job_skills_pinecone,best_skills,best_vector,'job_skills_pinecone.csv')
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)

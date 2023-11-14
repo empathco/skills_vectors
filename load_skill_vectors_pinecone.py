@@ -10,6 +10,7 @@ env = os.environ['PINECONE_ENV']
 BATCH_SIZE=1000
 
 pinecone.init(api_key=pinecone.api_key, environment = env)
+
 # Load the IDs from the CSV file
 ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
@@ -23,6 +24,7 @@ upsert_data = [{"id": ids[i], "values": vectors[i].tolist(),"metadata": {'level'
 print(f"{num_vectors} vectors uploading to the '{index_name}' index.")
 
 with pinecone.Index(index_name=index_name) as index:
+    index.delete(delete_all=True)
     first = 0
     tot_duration = 0
     while first < num_vectors: 
