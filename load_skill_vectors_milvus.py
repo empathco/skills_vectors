@@ -14,18 +14,21 @@ from pymilvus import (
 token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
 uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
+utility.drop_collection("skills")
 
 # Load the IDs from the CSV file
 ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 vectors = np.load('./data/skill_vectors.npy')
+levels = [str(x) for x in ids_df['level'].values]
 num_vectors = vectors.shape[0]
-data=[ids,vectors]
+data=[ids,vectors,levels]
 SKILLS_DIM = 512
 fields = [
     FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=100),
-    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=SKILLS_DIM)
+    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=SKILLS_DIM),
+    FieldSchema(name="level", dtype=DataType.VARCHAR,max_length=10)
 ]
 schema = CollectionSchema(fields, "skills")
 print(f"Create collection: skills")
@@ -36,7 +39,7 @@ result = skills_collection.insert(data)
 end = time.time() 
 duration = end - start
 tot_duration += duration 
-print(f"Result of data insert: {result} in {duration} seconds") 
+print(f"Result of data upsert: {result} in {duration} seconds") 
 
 # creating index
 start = time.time()

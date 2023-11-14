@@ -9,6 +9,7 @@ NUM_LISTS = 4
 ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
+levels = ids_df['level'].values
 vectors = np.load('./data/skill_vectors.npy')
 #print(f"Shape of skill_vectors.npy {vectors.shape}")
 num_vectors = vectors.shape[0]
@@ -27,7 +28,7 @@ cursor.execute(cmd)
 start = time.time()
 try:
     for i,row in ids_df.iterrows():
-      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]')"
+      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+int(row.iloc[2]) +")"
       cursor.execute(query)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:

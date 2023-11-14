@@ -53,7 +53,8 @@ with client.batch(batch_size = BATCH_SIZE, callback=cs_check_batch_result) as ba
         properties = {
             "abbreviation": ids_df['abbreviation'][i],
             "title": ids_df['title'][i],
-            "content": ids_df['content'][i]
+            "level_description": ids_df['level_description'][i],
+            "level": str(ids_df['level'][i])
         }
         client.batch.add_data_object(properties,class_name='Skill',vector=v)
 end = time.time()

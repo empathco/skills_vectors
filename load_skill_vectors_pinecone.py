@@ -19,7 +19,7 @@ vectors = np.load('./data/skill_vectors.npy')
 num_vectors = vectors.shape[0]
 
 # Generate a list of dictionaries for upsert
-upsert_data = [{"id": ids[i], "values": vectors[i].tolist()} for i in range(len(vectors))]
+upsert_data = [{"id": ids[i], "values": vectors[i].tolist(),"metadata": {'level':str(ids_df['level'][i])}} for i in range(len(vectors))]
 print(f"{num_vectors} vectors uploading to the '{index_name}' index.")
 
 with pinecone.Index(index_name=index_name) as index:

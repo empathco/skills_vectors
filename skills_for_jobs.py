@@ -13,7 +13,7 @@ from pymilvus import (
     Collection,
 )
 
-MAX_JOBS = 100
+MAX_JOBS = 1000
 TARGET_ORG = 'wg'
 MAX_SKILLS = 10
 NUM_LISTS = 4
@@ -60,6 +60,7 @@ def init_milvus():
     uri = os.environ['MILVUS_URL']
     connections.connect("default", uri=uri, token=token)
     collection = Collection("skills")
+    collection.load()
     return collection
 
 def pinecone_search(index,job_vec):
@@ -80,7 +81,7 @@ def weaviate_search(client,job_vec):
     start = time.time()
     result = (
         client.query
-        .get("Skill", ["abbreviation", "title"])
+        .get("Skill", ["abbreviation", "title","level"])
         .with_near_vector({
             "vector": job_vec
         })
@@ -99,7 +100,7 @@ def milvus_search(collection,job_vec):
     if len(job_skills_milvus)>=MAX_JOBS:
         return None 
     search_params = {
-        "metric_type": "L2", 
+        "metric_type": "L2", # this is actually the only option on the Zillig host
     }
     start = time.time()
     results = collection.search(
@@ -112,7 +113,7 @@ def milvus_search(collection,job_vec):
         expr=None,
         # set the names of the fields you want to 
         # retrieve from the search result.
-        output_fields=['id','embeddings'],
+        output_fields=['id','embeddings','level'],
         consistency_level="Strong"
     ) 
     #print(f"Milvus search results {results}")
@@ -128,7 +129,7 @@ def pg_search(cursor,job_vec):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
     #print(f"Finding skills for job {job.loc['job_title']}")
-    query = "SELECT abbreviation, embedding <=> '[" + vec_str +"]',embedding AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
+    query = "SELECT abbreviation, level,embedding <=> '[" + vec_str +"]',embedding AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
     #print(f"Query {query}")
     start = time.time()
     cursor.execute(query)
@@ -160,6 +161,7 @@ def save_job_skills_pinecone(job_skills,best_skills,best_vector,filename):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
                 value = row["skill"+str(i)]=job['matches'][i]['id']
+                row["level"+str(i)]=job['matches'][i]['level']
                 if value == prev_skill:
                     continue
                 if value in best_skills:
@@ -193,6 +195,7 @@ def save_job_skills_weaviate(job_skills,best_skills,best_vector,filename):
         similarities=[]
         for skill in skills:
             value = row["skill"+str(i)]=skill['abbreviation'] 
+            row["level"+str(i)]=skill['level']
             if value == prev_skill:
                 continue
             i+=1 
@@ -227,7 +230,8 @@ def save_job_skills_milvus(job_skills,best_skills,best_vector,filename):
             if hit is None: 
                 break
             #print(f"Hit {hit.entity}")
-            value = row["skill"+str(i+1)] = hit.id
+            value = row["skill"+str(i)] = hit.id
+            row["level"+str(i)]=hit.level 
             i+=1
             if value in best_skills:
                 #print("Found skill match")
@@ -255,6 +259,7 @@ def save_job_skills_pg(job_skills,best_skills,best_vector,filename):
         i=0
         for skill in skills:
             value = row["skill"+str(i)] = skill[0]
+            row["level"]=skill[2]
             i+=1
             if value in best_skills:
                 #print("Found skill match")
