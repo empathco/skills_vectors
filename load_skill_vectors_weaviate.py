@@ -3,6 +3,7 @@ import os
 import pandas as pd 
 import numpy as np
 import time
+import requests 
 
 WEAVIATE_SERVER=os.environ['WEAVIATE_CLUSTER']
 BATCH_SIZE = 100
@@ -34,6 +35,17 @@ client = weaviate.Client(
         url = WEAVIATE_SERVER,  
         auth_client_secret=resource_owner_config
     )
+
+print("Deleting existing skills")
+result=client.batch.delete_objects(
+    class_name='Skill',
+    where={
+        'path': ['id'],
+        'operator': 'Like',
+        'valueText': '*'
+    },
+)
+print(f"Deleted skills {result}")
 
 # Load the IDs from the CSV file
 ids_path = './data/skill_list.csv'

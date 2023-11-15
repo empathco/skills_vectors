@@ -269,7 +269,7 @@ def save_job_skills_pg(job_skills,best_skills,best_vector,filename):
                 #print("Found skill match")
                 count += 1
             similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
-        print(f"Average similarities: {average(similarities)}")
+        #print(f"Average similarities: {average(similarities)}")
         avg_similarities.append(average(similarities))
         row["quality"] = count 
         tot_quality += count 
