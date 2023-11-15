@@ -234,7 +234,7 @@ def save_job_skills_pg(job_skills,best_vector,filename):
         i=0
         for skill in skills:
             value = row["skill"+str(i)] = skill[0]
-            row["level"]=skill[2]
+            row["level"]=skill[1]
             i+=1
             similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
         #print(f"Average similarities: {average(similarities)}")
@@ -314,9 +314,6 @@ for i, job in jobs_df.iterrows():
     best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec) 
     job_skills_best[job['job_title']]= best_skills
 
-df = pd.DataFrame(job_skills_best)
-df.to_csv("job_skills_best.csv")
-
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}, error count {pinecone_errors}")
 save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone.csv')
@@ -332,4 +329,7 @@ save_job_skills_milvus(job_skills_milvus,best_vector,'job_skills_milvus.csv')
 avg_query_time = tot_durations['pg'] / len(job_skills_pg)
 print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
 save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg.csv')
+
+save_job_skills_pg(job_skills_best,best_vector,'job_skills_best.csv')
+
 
