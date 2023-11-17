@@ -237,7 +237,7 @@ def save_job_skills_pg(job_skills,best_vector,filename):
         i=0
         for skill in skills:
             value = row["skill"+str(i)] = skill[0]
-            row["level"]=skill[1]
+            row["level"+str(i)]=skill[1]
             i+=1
             similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
         #print(f"Average similarities: {average(similarities)}")
