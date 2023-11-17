@@ -67,12 +67,13 @@ def pinecone_search(index,job_vec):
     start = time.time()
     try:
         result = index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS,include_values=True,include_metadata=True)
+        job_skills_pinecone[job['job_title']]=result
     except Exception as e:
         print(f"Pinecone query error {e}")
     end = time.time()
     duration = end - start
 
-    job_skills_pinecone[job['job_title']]=result
+
     print (f"Query time Pinecone: {duration} seconds")
     tot_durations['pinecone'] += duration 
     return result
