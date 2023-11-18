@@ -236,6 +236,7 @@ def save_job_skills_pg(job_skills,best_vector,filename):
         skills=job_skills[key]
         i=0
         for skill in skills:
+            print(f"Skill {skill}")
             value = row["skill"+str(i)] = skill[0]
             row["level"+str(i)]=skill[1]
             i+=1
@@ -278,12 +279,12 @@ def get_nearest_neighbor_skills(cursor,job_vec):
     #print(f"Closest vector {results[0][2]}")
     return nn_skills,closest_vector
 
-jobs_path = './data/job_title_desc.csv'
+jobs_path = './data/generic_job_list.csv'
 jobs_df = pd.read_csv(jobs_path)
-if (jobs_df.size == 0) or (jobs_df[jobs_df['org_name']==TARGET_ORG].size==0):
+if jobs_df.size == 0:
     print ("No jobs are available.")
     exit()
-jobs_vectors = np.load('./data/jd_sem_vec.npy')
+jobs_vectors = np.load('./data/generic_job_desc_use.npy')
 
 job_skills_pinecone = {}
 job_skills_weaviate = {}
@@ -298,8 +299,6 @@ milvus_collection = init_milvus()
 pg_cursor = init_pg() 
 pinecone_errors = 0 
 for i, job in jobs_df.iterrows():
-    if job['org_name']!=TARGET_ORG: 
-        continue
     if len(job_skills_pinecone)>=MAX_JOBS:
         break
     job_vec = jobs_vectors[i]

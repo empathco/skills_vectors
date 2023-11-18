@@ -28,7 +28,8 @@ cursor.execute(cmd)
 start = time.time()
 try:
     for i,row in ids_df.iterrows():
-      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+int(row.iloc[2]) +")"
+      #print(f"Row {row}")
+      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) +")"
       cursor.execute(query)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:
