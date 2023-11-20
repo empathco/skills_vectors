@@ -236,7 +236,7 @@ def save_job_skills_pg(job_skills,best_vector,filename):
         skills=job_skills[key]
         i=0
         for skill in skills:
-            print(f"Skill {skill}")
+            #print(f"Skill {skill}")
             value = row["skill"+str(i)] = skill[0]
             row["level"+str(i)]=skill[1]
             i+=1
