@@ -13,6 +13,8 @@ from pymilvus import (
     Collection,
 )
 
+from qdrant_client import QdrantClient
+
 MAX_JOBS = 5000 # all jobs
 TARGET_ORG = 'wg'
 MAX_SKILLS = 10
@@ -41,6 +43,16 @@ def init_weaviate():
     )
     return client 
 
+def init_milvus():
+    token = os.environ['MILVUS_API_KEY']
+    uri = os.environ['MILVUS_URL']
+    token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
+    uri = os.environ['MILVUS_URL']
+    connections.connect("default", uri=uri, token=token)
+    collection = Collection("skills")
+    collection.load()
+    return collection
+
 def init_pg():
     host = os.environ['STACKHERO_POSTGRESQL_HOST']
     db_name = "skills_vectors"
@@ -53,21 +65,19 @@ def init_pg():
     cursor = conn.cursor()
     return cursor 
 
-def init_milvus():
-    token = os.environ['MILVUS_API_KEY']
-    uri = os.environ['MILVUS_URL']
-    token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
-    uri = os.environ['MILVUS_URL']
-    connections.connect("default", uri=uri, token=token)
-    collection = Collection("skills")
-    collection.load()
-    return collection
+def init_qdrant():
+    client = QdrantClient(
+        url="https://b6799a17-ad6f-4f78-9401-53de8faea2fd.us-east4-0.gcp.cloud.qdrant.io:6333", 
+        api_key=os.environ['QDRANT_API_KEY']
+    )
+    return client 
+
 
 def pinecone_search(index,job_vec):
     start = time.time()
     try:
         result = index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS,include_values=True,include_metadata=True)
-        job_skills_pinecone[job['job_title']]=result
+        job_skills_pinecone[job['job_code']]=result
     except Exception as e:
         print(f"Pinecone query error {e}")
     end = time.time()
@@ -90,7 +100,7 @@ def weaviate_search(client,job_vec):
             .with_near_vector({
                 "vector": job_vec
             })
-            .with_limit(MAX_SKILLS*5)
+            .with_limit(MAX_SKILLS)
             .with_additional(["distance","vector"])
             .do()
         )
@@ -100,7 +110,7 @@ def weaviate_search(client,job_vec):
 
     end = time.time()
     duration = end - start
-    job_skills_weaviate[job['job_title']]=result
+    job_skills_weaviate[job['job_code']]=result
     print (f"Query time Weaviate: {duration} seconds")
     tot_durations['weaviate'] += duration 
     return result
@@ -136,7 +146,7 @@ def milvus_search(collection,job_vec):
 def pg_search(cursor,job_vec):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
-    #print(f"Finding skills for job {job.loc['job_title']}")
+    #print(f"Finding skills for job {job.loc['job_code']}")
     query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]',embedding AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
     #print(f"Query {query}")
     start = time.time()
@@ -147,6 +157,16 @@ def pg_search(cursor,job_vec):
     print(f"Query time Postgres: {duration} seconds")
     tot_durations['pg'] += duration
     return skills 
+
+def qdrant_search(client,job_vec):
+    start = time.time()   
+    results = client.search(collection_name="skills",query_vector=job_vec,with_payload=True,with_vectors=True, limit=MAX_SKILLS)
+    #print(f"Results {results}")
+    end = time.time()
+    duration = end - start
+    print(f"Query time Qdrant: {duration} seconds")
+    tot_durations['qdrant'] += duration
+    return results
 
 def cos_sim(a,b):
     return dot(a, b)/(norm(a)*norm(b))
@@ -175,7 +195,7 @@ def save_job_skills_pinecone(job_skills,best_vector,filename):
  
         avg_similarities.append(average(similarities))
         rows.append(row)
-    print(f"Average similarity {average(avg_similarities)}")
+    print(f"Pinecone average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
@@ -199,7 +219,7 @@ def save_job_skills_weaviate(job_skills,best_vector,filename):
             similarities.append(cos_sim(skill['_additional']['vector'],best_vector))
         avg_similarities.append(average(similarities))
         rows.append(row)
-    print(f"Average similarity {average(avg_similarities)}")
+    print(f"Weaviate average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
@@ -217,13 +237,13 @@ def save_job_skills_milvus(job_skills,best_vector,filename):
         for hit in job:
             if hit is None: 
                 break
-            value = row["skill"+str(i)] = hit.entity.id
+            row["skill"+str(i)] = hit.entity.id
             row["level"+str(i)]=hit.entity.get('level')
             i+=1
             similarities.append(cos_sim(hit.entity.embeddings,best_vector))
         avg_similarities.append(average(similarities))
         rows.append(row)
-    print(f"Average similarity {average(avg_similarities)}")
+    print(f"Milvus average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
@@ -237,23 +257,42 @@ def save_job_skills_pg(job_skills,best_vector,filename):
         i=0
         for skill in skills:
             #print(f"Skill {skill}")
-            value = row["skill"+str(i)] = skill[0]
+            row["skill"+str(i)] = skill[0]
             row["level"+str(i)]=skill[1]
             i+=1
             similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
         #print(f"Average similarities: {average(similarities)}")
         avg_similarities.append(average(similarities))
         rows.append(row)
-    print(f"Average similarity {average(avg_similarities)}")
+    print(f"Postgres average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
+
+def save_job_skills_qdrant(job_skills,best_vector,filename):
+    rows=[]
+    similarities = []
+    avg_similarities=[]
+    i=0
+    for key,value in job_skills.items():
+        row={"job":key}
+        for skill in value: 
+            #print(f"skill {skill}")
+            row["skill"+str(i)] = skill.payload['abbreviation']
+            row["level"+str(i)] = skill.payload['l']
+            i+=1
+            similarities.append(cos_sim(skill.vector,best_vector))
+        avg_similarities.append(average(similarities))
+        rows.append(row)
+    print(f"Qdrant average similarity {average(avg_similarities)}")
+    df = pd.DataFrame(rows)
+    df.to_csv(filename)  
 
 # use the Postgres exact nearest neighbor search to find the "right" answers 
 # to evaluate the index Approximate Nearest Neighbor accuracy
 def get_nearest_neighbor_skills(cursor,job_vec):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
-    #print(f"Finding skills for job {job.loc['job_title']}")
+    #print(f"Finding skills for job {job.loc['job_code']}")
     # setting probes to the numnber of lists forces Exact Nearest Neighbor search
     query = "BEGIN;SET LOCAL ivfflat.probes = "+str(NUM_LISTS)+";"
     query += "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]' AS score,embedding FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
@@ -273,7 +312,7 @@ def get_nearest_neighbor_skills(cursor,job_vec):
     duration = end - start
     print(f"Query time Postgres exact nearest neighbor search: {duration} seconds\n")
     cursor.execute("COMMIT")
-    tot_durations['pg'] += duration
+    tot_durations['best'] += duration
     #print(f"Best skills: {nn_skills}")
     closest_vector = np.array(ast.literal_eval(results[0][3]))
     #print(f"Closest vector {results[0][2]}")
@@ -290,13 +329,15 @@ job_skills_pinecone = {}
 job_skills_weaviate = {}
 job_skills_milvus = {}
 job_skills_pg = {}
+job_skills_qdrant = {}
 job_skills_best = {}
-tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':0}
+tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':0,'qdrant':0,'best':0}
 
 pinecone_skills_index = init_pinecone() 
 weaviate_client = init_weaviate()
 milvus_collection = init_milvus()
 pg_cursor = init_pg() 
+qdrant_client = init_qdrant()
 pinecone_errors = 0 
 for i, job in jobs_df.iterrows():
     if len(job_skills_pinecone)>=MAX_JOBS:
@@ -308,13 +349,14 @@ for i, job in jobs_df.iterrows():
         print("No result from Pinecone search")
         pinecone_errors+=1
     else: 
-        job_skills_pinecone[job['job_title']] = result
+        job_skills_pinecone[job['job_code']] = result
 
-    job_skills_weaviate[job['job_title']] = weaviate_search(weaviate_client,job_vec)
-    job_skills_milvus[job['job_title']] = milvus_search(milvus_collection,job_vec)
-    job_skills_pg[job['job_title']] = pg_search(pg_cursor,job_vec)  
+    job_skills_weaviate[job['job_code']] = weaviate_search(weaviate_client,job_vec)
+    job_skills_milvus[job['job_code']] = milvus_search(milvus_collection,job_vec)
+    job_skills_pg[job['job_code']] = pg_search(pg_cursor,job_vec)  
+    job_skills_qdrant[job['job_code']] = qdrant_search(qdrant_client,job_vec)
     best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec) 
-    job_skills_best[job['job_title']]= best_skills
+    job_skills_best[job['job_code']]= best_skills
 
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}, error count {pinecone_errors}")
@@ -332,6 +374,12 @@ avg_query_time = tot_durations['pg'] / len(job_skills_pg)
 print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
 save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg.csv')
 
+avg_query_time = tot_durations['qdrant'] / len(job_skills_qdrant)
+print(f"Qdrant: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
+save_job_skills_qdrant(job_skills_qdrant,best_vector,'job_skills_qdrant.csv')
+
+avg_query_time = tot_durations['best'] / len(job_skills_best)
+print(f"Best skills with Postgres ENN: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
 save_job_skills_pg(job_skills_best,best_vector,'job_skills_best.csv')
 
 

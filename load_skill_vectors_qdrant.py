@@ -19,6 +19,8 @@ client = QdrantClient(
 )
 
 client.delete_collection(collection_name="skills")
+
+start = time.time()
 client.create_collection(
     collection_name="skills",
     vectors_config=models.VectorParams(size=VEC_SIZE, distance=models.Distance.COSINE),
@@ -36,9 +38,8 @@ for v in vectors:
 print(f"Vlists {vlists[0]}")
 num_vectors = len(ids_df)
 ids=[i for i in range(len(vlists))]
-payloads = [{'abbreviation':ids_df['abbreviation'][i]}  for i in range(num_vectors)]
+payloads = [{'abbreviation':ids_df['abbreviation'][i],'l':str(ids_df['level'][i])}  for i in range(num_vectors)]
 
-start = time.time()
 print(f"{num_vectors} vectors uploading...")
 client.upsert(collection_name="skills",points=models.Batch(ids=ids,payloads=payloads,vectors=vlists))
 end = time.time()
