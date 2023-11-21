@@ -174,115 +174,164 @@ def cos_sim(a,b):
 def average(lst): 
     return sum(lst) / len(lst) 
 
-def save_job_skills_pinecone(job_skills,best_vector,filename):
+def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=None):
     #print(f"Pinecone: evaluating {len(job_skills)} skills")
     rows=[]
+    all_matches = 0 
+    avg_similarities=[]
     for key,job in job_skills.items():
         count = 0 
         row = {"job":key}
         prev_skill = None 
         similarities=[]
-        avg_similarities=[]
         for i in range(len(job['matches'])):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
-                value = row["skill"+str(i)]=job['matches'][i]['id']
-                row["level"+str(i)]=job['matches'][i]['metadata']['level']
-                if value == prev_skill:
+                skill = row["skill"+str(i)]=job['matches'][i]['id']
+                if skill == prev_skill:
                     continue
+                prev_skill = skill
+                if job_skills_best and (skill in job_skills_best[key]):
+                    skill_matches += 1
+                row["level"+str(i)]=job['matches'][i]['metadata']['level']
+
                 #print(f"Best vector {len(best_vector)}, current match vector {len(job['matches'][i]['values'])}")
                 similarities.append(cos_sim(job['matches'][i]['values'],best_vector))
- 
+        all_matches += skill_matches   
         avg_similarities.append(average(similarities))
         rows.append(row)
+
+    avg_matches = all_matches/len(job_skills)
+    print(f"All matches {all_matches}, average {avg_matches}")
     print(f"Pinecone average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_weaviate(job_skills,best_vector,filename):
+def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=None):
     #print(f"Weaviate: evaluating {len(job_skills)} skills")
     rows=[]
     avg_similarities=[]
+    all_matches = 0 
     for key,job in job_skills.items():
         row = {"job":key}
-        #print(f"Job {job}")
         skills=job['data']['Get']['Skill']
         i=0
         prev_skill = None
         similarities=[]
         for skill in skills:
-            value = row["skill"+str(i)]=skill['abbreviation'] 
+            skill = row["skill"+str(i)]=skill['abbreviation'] 
+            if skill == prev_skill:
+                continue
+            prev_skill = skill
+            if job_skills_best and (skill in job_skills_best[key]):
+                skill_matches += 1
             row["level"+str(i)]=skill['level']
             if value == prev_skill:
                 continue
             i+=1 
             similarities.append(cos_sim(skill['_additional']['vector'],best_vector))
+        all_matches += skill_matches  
         avg_similarities.append(average(similarities))
         rows.append(row)
+
+    avg_matches = all_matches/len(job_skills)
+    print(f"All matches {all_matches}, average {avg_matches}")
     print(f"Weaviate average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_milvus(job_skills,best_vector,filename):
+def save_job_skills_milvus(job_skills,best_vector,filename,job_skills_best=None):
     rows=[]
-    similarities=[]
     avg_similarities=[]
+    all_matches = 0 
     for key,job in job_skills.items():
         row = {"job":key}
         #print(f"Job: {job}")
         if job is None:
             break 
-        similarities=[]
         i=0
+        skill_matches = 0 
+        prev_skill = None
+        similarities=[]
         for hit in job:
             if hit is None: 
                 break
-            row["skill"+str(i)] = hit.entity.id
+            skill = row["skill"+str(i)] = hit.entity.id
+            if skill == prev_skill:
+                continue
+            prev_skill = skill
+            if job_skills_best and (skill in job_skills_best[key]):
+                skill_matches += 1
             row["level"+str(i)]=hit.entity.get('level')
             i+=1
             similarities.append(cos_sim(hit.entity.embeddings,best_vector))
+        all_matches += skill_matches    
         avg_similarities.append(average(similarities))
         rows.append(row)
+
+    avg_matches = all_matches/len(job_skills)
+    print(f"All matches {all_matches}, average {avg_matches}")
     print(f"Milvus average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_pg(job_skills,best_vector,filename):
+def save_job_skills_pg(job_skills,best_vector,filename,job_skills_best=None):
     rows=[]
-    similarities = []
     avg_similarities=[]
+    all_matches = 0 
     for key,job in job_skills.items():
         row = {"job":key}
         skills=job_skills[key]
         i=0
+        skill_matches = 0 
+        prev_skill = None
+        similarities=[]
         for skill in skills:
-            #print(f"Skill {skill}")
-            row["skill"+str(i)] = skill[0]
+            skill = row["skill"+str(i)] = skill[0]
+            if skill == prev_skill:
+                continue
+            prev_skill = skill
+            if job_skills_best and (skill in job_skills_best[key]):
+                skill_matches += 1
             row["level"+str(i)]=skill[1]
             i+=1
             similarities.append(cos_sim(np.array(ast.literal_eval(skill[3])),best_vector))
-        #print(f"Average similarities: {average(similarities)}")
+        all_matches += skill_matches    
         avg_similarities.append(average(similarities))
         rows.append(row)
+
+    avg_matches = all_matches/len(job_skills)
+    print(f"All matches {all_matches}, average {avg_matches}")
     print(f"Postgres average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_qdrant(job_skills,best_vector,filename):
+def save_job_skills_qdrant(job_skills,best_vector,filename,job_skills_best=None):
     rows=[]
-    similarities = []
     avg_similarities=[]
     i=0
+    all_matches = 0 
     for key,value in job_skills.items():
         row={"job":key}
+        skill_matches = 0 
+        prev_skill = None
+        similarities=[]
         for skill in value: 
-            #print(f"skill {skill}")
-            row["skill"+str(i)] = skill.payload['abbreviation']
+            skill = row["skill"+str(i)] = skill.payload['abbreviation']
+            if skill == prev_skill:
+                continue
+            prev_skill = skill
+            if job_skills_best and (skill in job_skills_best[key]):
+                skill_matches += 1
             row["level"+str(i)] = skill.payload['l']
             i+=1
             similarities.append(cos_sim(skill.vector,best_vector))
+        all_matches += skill_matches        
         avg_similarities.append(average(similarities))
         rows.append(row)
+
+    avg_matches = all_matches/len(job_skills)
+    print(f"All matches {all_matches}, average {avg_matches}")
     print(f"Qdrant average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)  
@@ -303,9 +352,12 @@ def get_nearest_neighbor_skills(cursor,job_vec):
     results = cursor.fetchall()
     end = time.time()
     nn_skills = []
+    prev_skill = None
     for result in results:
-        if (len(nn_skills)>0) and result[0]==nn_skills[-1]:
+        skill = result[0]
+        if skill == prev_skill:
             continue
+        prev_skill = skill
         nn_skills.append(result)
         if len(nn_skills)>=MAX_SKILLS:
             break       
@@ -360,23 +412,23 @@ for i, job in jobs_df.iterrows():
 
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}, error count {pinecone_errors}")
-save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone.csv')
+save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone.csv',job_skills_best)
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Weaviate: total query time {tot_durations['weaviate']}, average {avg_query_time}")
-save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate.csv')
+save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate.csv',job_skills_best)
 
 avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
 print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
-save_job_skills_milvus(job_skills_milvus,best_vector,'job_skills_milvus.csv')
+save_job_skills_milvus(job_skills_milvus,best_vector,'job_skills_milvus.csv',job_skills_best)
 
 avg_query_time = tot_durations['pg'] / len(job_skills_pg)
 print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
-save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg.csv')
+save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg.csv',job_skills_best)
 
 avg_query_time = tot_durations['qdrant'] / len(job_skills_qdrant)
 print(f"Qdrant: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
-save_job_skills_qdrant(job_skills_qdrant,best_vector,'job_skills_qdrant.csv')
+save_job_skills_qdrant(job_skills_qdrant,best_vector,'job_skills_qdrant.csv',job_skills_best)
 
 avg_query_time = tot_durations['best'] / len(job_skills_best)
 print(f"Best skills with Postgres ENN: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
