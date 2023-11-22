@@ -16,7 +16,6 @@ from pymilvus import (
 from qdrant_client import QdrantClient
 
 MAX_JOBS = 5000 # all jobs
-TARGET_ORG = 'wg'
 MAX_SKILLS = 10
 NUM_LISTS = 4
 
@@ -160,8 +159,11 @@ def pg_search(cursor,job_vec):
 
 def qdrant_search(client,job_vec):
     start = time.time()   
-    results = client.search(collection_name="skills",query_vector=job_vec,with_payload=True,with_vectors=True, limit=MAX_SKILLS)
-    #print(f"Results {results}")
+    try: 
+        results = client.search(collection_name="skills",query_vector=job_vec,with_payload=True,with_vectors=True, limit=MAX_SKILLS)
+    except Exception as e:
+        print(f"Failed Qdrant search {e}")
+        results = None
     end = time.time()
     duration = end - start
     print(f"Query time Qdrant: {duration} seconds")
@@ -219,11 +221,12 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
         i=0
         prev_skill = None
         similarities=[]
+        skill_matches=0
         for skill in skills:
-            skill = row["skill"+str(i)]=skill['abbreviation'] 
-            if skill == prev_skill:
+            value = row["skill"+str(i)]=skill['abbreviation'] 
+            if value == prev_skill:
                 continue
-            prev_skill = skill
+            prev_skill = value
             if job_skills_best and (skill in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill['level']
@@ -231,13 +234,16 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
                 continue
             i+=1 
             similarities.append(cos_sim(skill['_additional']['vector'],best_vector))
-        all_matches += skill_matches  
-        avg_similarities.append(average(similarities))
-        rows.append(row)
+        if len(similarities)>0:
+            all_matches += skill_matches 
+            print(f"Similarities {similarities} ({len(similarities)})") 
+            avg_similarities.append(average(similarities))
+            rows.append(row)
 
     avg_matches = all_matches/len(job_skills)
     print(f"All matches {all_matches}, average {avg_matches}")
-    print(f"Weaviate average similarity {average(avg_similarities)}")
+    if len(avg_similarities)>0:
+        print(f"Weaviate average similarity {average(avg_similarities)}")
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
@@ -288,10 +294,10 @@ def save_job_skills_pg(job_skills,best_vector,filename,job_skills_best=None):
         prev_skill = None
         similarities=[]
         for skill in skills:
-            skill = row["skill"+str(i)] = skill[0]
-            if skill == prev_skill:
+            value = row["skill"+str(i)] = skill[0]
+            if value == prev_skill:
                 continue
-            prev_skill = skill
+            prev_skill = value
             if job_skills_best and (skill in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill[1]
@@ -318,10 +324,10 @@ def save_job_skills_qdrant(job_skills,best_vector,filename,job_skills_best=None)
         prev_skill = None
         similarities=[]
         for skill in value: 
-            skill = row["skill"+str(i)] = skill.payload['abbreviation']
-            if skill == prev_skill:
+            value = row["skill"+str(i)] = skill.payload['abbreviation']
+            if value== prev_skill:
                 continue
-            prev_skill = skill
+            prev_skill = ValueError
             if job_skills_best and (skill in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)] = skill.payload['l']
