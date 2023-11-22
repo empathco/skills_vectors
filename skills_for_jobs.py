@@ -184,6 +184,7 @@ def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=Non
         row = {"job":key}
         prev_skill = None 
         similarities=[]
+        skill_matches = 0 
         for i in range(len(job['matches'])):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
