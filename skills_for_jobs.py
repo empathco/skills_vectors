@@ -194,7 +194,7 @@ def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=Non
                 if value == prev_skill:
                     continue
                 prev_skill = value
-                if job_skills_best and (skill in job_skills_best[key]):
+                if job_skills_best and (value in job_skills_best[key]):
                     skill_matches += 1
                 row["level"+str(i)]=job['matches'][i]['metadata']['level']
 
@@ -222,23 +222,24 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
         prev_skill = None
         similarities=[]
         skill_matches=0
+        #print(f"Number of skills {len(skills)}")
         for skill in skills:
-            value = row["skill"+str(i)]=skill['abbreviation'] 
+            value = row["skill"+str(i)]=skill['abbreviation']
+            #print(f"Skill {value}") 
             if value == prev_skill:
+                #print(f"Duplicate skill {value}")
                 continue
             prev_skill = value
-            if job_skills_best and (skill in job_skills_best[key]):
+            if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill['level']
-            if value == prev_skill:
-                continue
             i+=1 
             similarities.append(cos_sim(skill['_additional']['vector'],best_vector))
         if len(similarities)>0:
             all_matches += skill_matches 
             print(f"Similarities {similarities} ({len(similarities)})") 
             avg_similarities.append(average(similarities))
-            rows.append(row)
+        rows.append(row)
 
     avg_matches = all_matches/len(job_skills)
     print(f"All matches {all_matches}, average {avg_matches}")
@@ -267,7 +268,7 @@ def save_job_skills_milvus(job_skills,best_vector,filename,job_skills_best=None)
             if value == prev_skill:
                 continue
             prev_skill = value
-            if job_skills_best and (skill in job_skills_best[key]):
+            if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=hit.entity.get('level')
             i+=1
@@ -298,7 +299,7 @@ def save_job_skills_pg(job_skills,best_vector,filename,job_skills_best=None):
             if value == prev_skill:
                 continue
             prev_skill = value
-            if job_skills_best and (skill in job_skills_best[key]):
+            if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill[1]
             i+=1
@@ -328,7 +329,7 @@ def save_job_skills_qdrant(job_skills,best_vector,filename,job_skills_best=None)
             if value== prev_skill:
                 continue
             prev_skill = ValueError
-            if job_skills_best and (skill in job_skills_best[key]):
+            if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)] = skill.payload['l']
             i+=1
