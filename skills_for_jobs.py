@@ -190,10 +190,10 @@ def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=Non
         for i in range(len(job['matches'])):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
-                skill = row["skill"+str(i)]=job['matches'][i]['id']
-                if skill == prev_skill:
+                value = row["skill"+str(i)]=job['matches'][i]['id']
+                if value == prev_skill:
                     continue
-                prev_skill = skill
+                prev_skill = value
                 if job_skills_best and (skill in job_skills_best[key]):
                     skill_matches += 1
                 row["level"+str(i)]=job['matches'][i]['metadata']['level']
@@ -263,10 +263,10 @@ def save_job_skills_milvus(job_skills,best_vector,filename,job_skills_best=None)
         for hit in job:
             if hit is None: 
                 break
-            skill = row["skill"+str(i)] = hit.entity.id
-            if skill == prev_skill:
+            value = row["skill"+str(i)] = hit.entity.id
+            if value == prev_skill:
                 continue
-            prev_skill = skill
+            prev_skill = value
             if job_skills_best and (skill in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=hit.entity.get('level')
