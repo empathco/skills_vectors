@@ -2,7 +2,7 @@ Authlib==1.2.1
 certifi==2023.7.22
 cffi==1.16.0
 charset-normalizer==3.3.0
-cryptography==41.0.4
+cryptography==41.0.6
 dnspython==2.4.2
 environs==9.5.0
 grpcio==1.53.0
