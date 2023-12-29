@@ -5,12 +5,14 @@ charset-normalizer==3.3.0
 cryptography==41.0.4
 dnspython==2.4.2
 environs==9.5.0
+google-generativeai
 grpcio==1.53.0
 idna==3.4
 loguru==0.7.2
 marshmallow==3.20.1
 minio==7.1.17
 numpy==1.26.1
+openai==1.6.1
 packaging==23.2
 pandas==2.1.1
 pinecone-client==2.2.4
@@ -22,6 +24,7 @@ python-dateutil==2.8.2
 python-dotenv==1.0.0
 pytz==2023.3.post1
 PyYAML==6.0.1
+qdrant-client==1.7.0
 requests==2.31.0
 scipy==1.11.3
 six==1.16.0
