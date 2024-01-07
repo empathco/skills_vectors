@@ -14,7 +14,7 @@ VEC_SIZE = 512
 from qdrant_client import QdrantClient
 
 client = QdrantClient(
-    url="https://b6799a17-ad6f-4f78-9401-53de8faea2fd.us-east4-0.gcp.cloud.qdrant.io:6333", 
+    url=os.environ['QDRANT_URL'], 
     api_key=os.environ['QDRANT_API_KEY']
 )
 
