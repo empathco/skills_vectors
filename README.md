@@ -22,19 +22,9 @@ First load the skills vectors to your DB of choice.
     python load_skill_vectors_pg.py
 
 ## Performing Semantic Search
-Then perform semantic search with the skills_for_jobs*.py scripts
+Then perform semantic search with the skills_for_jobs.py script
 
-### Pinecone
-    python3 skills_for_jobs_pinecone.py
-
-### Weaviate
-    python skills_for_jobs_weaviate.py
-
-### Milvus
-    python skills_for_jobs_milvus.py
-
-### pgvector
-    python skills_for_jobs_pg.py
+    python skills_for_jobs.py
 
 ## Configure Environment Variables 
 Set the following env vars to access and use the various vector DBs.
@@ -52,14 +42,14 @@ Set the following env vars to access and use the various vector DBs.
 ## Create Skills and Jobs Files 
 Grab some text for skill descriptions and job descriptions from your site of choice (or have ChatGPT write them)
 
-### ./data/job_title_desc.csv 
+### ./data/generic_job_list.csv 
     job_code,org_name,org_job_code,job_title,jd_plain_text,processed_title
     your text here
 
-### jd_and_title_sem_vec.npy 
+### ./data/generic_job_desc_use.npy 
     put your embeddings here one to a line 
 
-### ./data/epl_skill_list.csv 
+### ./data/skill_list.csv 
     abbreviation,title,text_type,content
 
 ### skill_vectors.npy 
