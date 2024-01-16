@@ -237,7 +237,7 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
             similarities.append(cos_sim(skill['_additional']['vector'],best_vector))
         if len(similarities)>0:
             all_matches += skill_matches 
-            print(f"Similarities {similarities} ({len(similarities)})") 
+            #print(f"Similarities {similarities} ({len(similarities)})") 
             avg_similarities.append(average(similarities))
         rows.append(row)
 

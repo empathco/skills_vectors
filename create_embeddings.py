@@ -1,5 +1,6 @@
 import os
 import time
+import sys 
 
 from openai import OpenAI
 import google.generativeai as genai
@@ -25,7 +26,7 @@ gemini = genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 providers = ["openai", "gemini"]
 
 # change providers for embeddings here
-provider = providers[0]
+provider = providers[1]
 print(f'Using {provider} as the provider of embeddings.')
 response = str(input("continue? y/n\n"))
 if response not in ("y","Y","yes","Yes"):
