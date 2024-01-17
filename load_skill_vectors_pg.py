@@ -12,14 +12,14 @@ if provider == "openai":
 else:
     SKILLS_DIM = 768
 
-SKILLS_DIM = 512
 NUM_LISTS = 4 
 ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 levels = ids_df['level'].values
-vectors = np.load('./data/skill_vectors.npy')
-#print(f"Shape of skill_vectors.npy {vectors.shape}")
+skill_vectors_file = "./data/" + provider + "_skill_vectors.npy"
+vectors = np.load(skill_vectors_file)
+print(f"Shape of skill_vectors.npy {vectors.shape}")
 num_vectors = vectors.shape[0]
 
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -33,7 +33,7 @@ start = time.time()
 try:
     for i,row in ids_df.iterrows():
       #print(f"Row {row}")
-      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL,LLM) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + "," + provider +");"
+      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL,PROVIDER) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + ",'" + provider +"');"
       cursor.execute(query)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:
