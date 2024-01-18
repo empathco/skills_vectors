@@ -11,7 +11,7 @@ import sys
 from qdrant_client import QdrantClient
 
 QDRANT_SERVER=os.environ['QDRANT_URL']
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 
 provider = sys.argv[1]
 if provider == "openai":
@@ -24,10 +24,10 @@ client = QdrantClient(
     api_key=os.environ['QDRANT_API_KEY']
 )
 
-#client.delete_collection(collection_name="skills")
-
 start = time.time()
 collection_name=provider+"-skills"
+
+client.delete_collection(collection_name=collection_name)
 client.create_collection(
     collection_name=collection_name,
     vectors_config=models.VectorParams(size=SKILLS_DIM, distance=models.Distance.COSINE),
@@ -45,12 +45,16 @@ for v in vectors:
     i+=1
 #print(f"Vlists {vlists[0]}")
 num_vectors = len(ids_df)
-ids=[i for i in range(len(vlists))]
-payloads = [{'abbreviation':ids_df['abbreviation'][i],'l':str(ids_df['level'][i])}  for i in range(num_vectors)]
+first_vector=0
+while (first_vector<num_vectors):
+    last_vector=min(first_vector+BATCH_SIZE,num_vectors)
+    
+    ids=[i for i in range(first_vector,last_vector)]
+    payloads = [{'abbreviation':ids_df['abbreviation'][i],'l':str(ids_df['level'][i]),'provider':provider}  for i in range(first_vector,last_vector)]
 
-print(f"{num_vectors} vectors uploading...")
-
-client.upsert(collection_name=collection_name,points=models.Batch(ids=ids,payloads=payloads,vectors=vlists))
+    print(f"Uploading from {first_vector} to {last_vector}")
+    client.upsert(collection_name=collection_name,points=models.Batch(ids=ids,payloads=payloads,vectors=vlists[first_vector:last_vector]))
+    first_vector=last_vector
 end = time.time()
 tot_duration = end - start
 print(f"{num_vectors} vectors uploaded in {tot_duration} seconds")
