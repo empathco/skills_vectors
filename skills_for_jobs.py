@@ -4,7 +4,8 @@ import numpy as np
 import time
 from numpy import dot
 from numpy.linalg import norm
-import ast 
+import ast
+import sys 
 
 from pymilvus import (
     connections,
@@ -21,9 +22,9 @@ NUM_LISTS = 4
 
 WEAVIATE_SERVER=os.environ['WEAVIATE_CLUSTER']
 
-def init_pinecone():
+def init_pinecone(provider="gemini"):
     pinecone.api_key = os.environ['PINECONE_API_KEY']
-    skill_index_name = 'skills'
+    skill_index_name = 'skills-'+ provider
     env = os.environ['PINECONE_ENV']
     pinecone.init(api_key=pinecone.api_key, environment = env)
     index = pinecone.Index(skill_index_name)
@@ -72,7 +73,7 @@ def init_qdrant():
     return client 
 
 
-def pinecone_search(index,job_vec):
+def pinecone_search(index,job_vec,provider="gemini"):
     start = time.time()
     try:
         result = index.query(vector=job_vec.tolist(),top_k=MAX_SKILLS,include_values=True,include_metadata=True)
@@ -87,15 +88,16 @@ def pinecone_search(index,job_vec):
     tot_durations['pinecone'] += duration 
     return result
 
-def weaviate_search(client,job_vec):
+def weaviate_search(client,job_vec,provider="gemini"):
     if len(job_skills_weaviate)>=MAX_JOBS:
         return None 
     start = time.time()
     result = None 
     try: 
+        class_name=provider+"_Skill"
         result = (
             client.query
-            .get("Skill", ["abbreviation", "title","level"])
+            .get(class_name, ["abbreviation", "title","level"])
             .with_near_vector({
                 "vector": job_vec
             })
@@ -378,6 +380,8 @@ def get_nearest_neighbor_skills(cursor,job_vec):
     #print(f"Closest vector {results[0][2]}")
     return nn_skills,closest_vector
 
+provider = sys.argv[1]
+
 jobs_path = './data/generic_job_list.csv'
 jobs_df = pd.read_csv(jobs_path)
 if jobs_df.size == 0:
@@ -393,7 +397,7 @@ job_skills_qdrant = {}
 job_skills_best = {}
 tot_durations = {'pinecone':0,'weaviate':0,'milvus':0,'pg':0,'qdrant':0,'best':0}
 
-pinecone_skills_index = init_pinecone() 
+pinecone_skills_index = init_pinecone(provider) 
 weaviate_client = init_weaviate()
 milvus_collection = init_milvus()
 pg_cursor = init_pg() 
@@ -404,42 +408,42 @@ for i, job in jobs_df.iterrows():
         break
     job_vec = jobs_vectors[i]
 
-    result = pinecone_search(pinecone_skills_index,job_vec)
+    result = pinecone_search(pinecone_skills_index,job_vec,provider)
     if result is None:
         print("No result from Pinecone search")
         pinecone_errors+=1
     else: 
         job_skills_pinecone[job['job_code']] = result
 
-    job_skills_weaviate[job['job_code']] = weaviate_search(weaviate_client,job_vec)
-    job_skills_milvus[job['job_code']] = milvus_search(milvus_collection,job_vec)
-    job_skills_pg[job['job_code']] = pg_search(pg_cursor,job_vec)  
-    job_skills_qdrant[job['job_code']] = qdrant_search(qdrant_client,job_vec)
-    best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec) 
+    job_skills_weaviate[job['job_code']] = weaviate_search(weaviate_client,job_vec,provider)
+    job_skills_milvus[job['job_code']] = milvus_search(milvus_collection,job_vec,provider)
+    job_skills_pg[job['job_code']] = pg_search(pg_cursor,job_vec,provider)  
+    job_skills_qdrant[job['job_code']] = qdrant_search(qdrant_client,job_vec,provider)
+    best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec,provider) 
     job_skills_best[job['job_code']]= best_skills
 
 avg_query_time = tot_durations['pinecone'] / len(job_skills_pinecone)
 print(f"Pinecone: total query time {tot_durations['pinecone']}, average {avg_query_time}, error count {pinecone_errors}")
-save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone.csv',job_skills_best)
+save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone'+provider+'.csv',job_skills_best)
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Weaviate: total query time {tot_durations['weaviate']}, average {avg_query_time}")
-save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate.csv',job_skills_best)
+save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate_'+provider+'.csv',job_skills_best)
 
 avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
 print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
-save_job_skills_milvus(job_skills_milvus,best_vector,'job_skills_milvus.csv',job_skills_best)
+save_job_skills_milvus(job_skills_milvus,best_vector,'job_skills_milvus_'+provider+'.csv',job_skills_best)
 
 avg_query_time = tot_durations['pg'] / len(job_skills_pg)
 print(f"Postgres: Total query time {tot_durations['pg']}, average {avg_query_time}")
-save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg.csv',job_skills_best)
+save_job_skills_pg(job_skills_pg,best_vector,'job_skills_pg_'+provider+'.csv',job_skills_best)
 
 avg_query_time = tot_durations['qdrant'] / len(job_skills_qdrant)
 print(f"Qdrant: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
-save_job_skills_qdrant(job_skills_qdrant,best_vector,'job_skills_qdrant.csv',job_skills_best)
+save_job_skills_qdrant(job_skills_qdrant,best_vector,'job_skills_qdrant_'+provider+'.csv',job_skills_best)
 
 avg_query_time = tot_durations['best'] / len(job_skills_best)
 print(f"Best skills with Postgres ENN: Total query time {tot_durations['qdrant']}, average {avg_query_time}")
-save_job_skills_pg(job_skills_best,best_vector,'job_skills_best.csv')
+save_job_skills_pg(job_skills_best,best_vector,'job_skills_best_'+provider+'.csv')
 
 
