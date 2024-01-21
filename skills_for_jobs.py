@@ -1,4 +1,5 @@
 import pinecone, weaviate, psycopg2, os 
+from pinecone import Pinecone
 import pandas as pd 
 import numpy as np
 import time
@@ -23,11 +24,11 @@ NUM_LISTS = 4
 WEAVIATE_SERVER=os.environ['WEAVIATE_CLUSTER']
 
 def init_pinecone(provider="gemini"):
-    pinecone.api_key = os.environ['PINECONE_API_KEY']
+    api_key = os.environ['PINECONE_API_KEY']
     skill_index_name = 'skills-'+ provider
     env = os.environ['PINECONE_ENV']
-    pinecone.init(api_key=pinecone.api_key, environment = env)
-    index = pinecone.Index(skill_index_name)
+    pc=Pinecone(api_key=api_key, environment = env)
+    index = pc.Index(skill_index_name)
     return index
 
 def init_weaviate():
@@ -49,19 +50,14 @@ def init_milvus():
     token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
     uri = os.environ['MILVUS_URL']
     connections.connect("default", uri=uri, token=token)
-    collection = Collection("skills")
+    collection_name = provider + "_skills"
+    collection = Collection(collection_name)
     collection.load()
     return collection
 
 def init_pg():
-    host = os.environ['STACKHERO_POSTGRESQL_HOST']
-    db_name = "skills_vectors"
-    db_user = "admin"
-    db_password = os.environ['STACKHERO_POSTGRESQL_ADMIN_PASSWORD']
-    conn = psycopg2.connect(database=db_name,
-                            host=host,
-                            user=db_user,
-                            password=db_password)
+    DATABASE_URL = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cursor = conn.cursor()
     return cursor 
 
@@ -80,6 +76,7 @@ def pinecone_search(index,job_vec,provider="gemini"):
         job_skills_pinecone[job['job_code']]=result
     except Exception as e:
         print(f"Pinecone query error {e}")
+        result = None
     end = time.time()
     duration = end - start
 

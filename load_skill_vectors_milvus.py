@@ -21,14 +21,14 @@ from pymilvus import (
 token = "db_admin:"+ os.environ['MILVUS_PASSWORD']
 uri = os.environ['MILVUS_URL']
 connections.connect("default", uri=uri, token=token)
-utility.drop_collection("skills")
+collection_name = provider + "_skills"
+utility.drop_collection(collection_name)
 
 # Load the IDs from the CSV file
 ids_path = './data/skill_list.csv'
 ids_df = pd.read_csv(ids_path)
 ids = ids_df['abbreviation'].values
 skill_vectors_file = "./data/" + provider + "_skill_vectors.npy"
-
 vectors = np.load(skill_vectors_file)
 levels = [str(x) for x in ids_df['level'].values]
 num_vectors = vectors.shape[0]
@@ -40,7 +40,7 @@ fields = [
     FieldSchema(name="level", dtype=DataType.VARCHAR,max_length=16)
 ]
 schema = CollectionSchema(fields, "skills")
-collection_name = provider + "_skills"
+
 skills_collection = Collection(collection_name, schema)
 tot_duration = 0
 start = time.time()
