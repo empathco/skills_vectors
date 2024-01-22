@@ -70,7 +70,6 @@ def init_qdrant():
     )
     return client 
 
-
 def pinecone_search(index,job_vec,provider="gemini"):
     start = time.time()
     try:
@@ -156,22 +155,11 @@ def pg_search(cursor,job_vec,provider):
     tot_durations['pg'] += duration
     return skills 
 
-def qdrant_search(client,job_vec,provider):
+def qdrant_search(client,job_vec,provider="gemini"):
+    collection_name=provider+"-skills"
     start = time.time()   
     try: 
-        query_filter=Filter(
-            must=[
-                FieldCondition(
-                    key="city",
-                    match=MatchValue(
-                        value="London",
-                    ),
-                )
-            ]
-        )
-
-        results = client.search(collection_name="skills",query_vector=job_vec,query_filter=query_filter,
-                                with_payload=True,with_vectors=True, limit=MAX_SKILLS)
+        results = client.search(collection_name=collection_name,query_vector=job_vec,with_payload=True,with_vectors=True, limit=MAX_SKILLS)
     except Exception as e:
         print(f"Failed Qdrant search {e}")
         results = None
