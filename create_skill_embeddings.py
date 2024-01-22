@@ -21,16 +21,11 @@ def get_embedding_gemini(text, model="models/embedding-001"):
 
 
 load_dotenv()
+
+provider = sys.argv[1]
+
 openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 gemini = genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-providers = ["openai", "gemini"]
-
-# change providers for embeddings here
-provider = providers[1]
-print(f'Using {provider} as the provider of embeddings.')
-response = str(input("continue? y/n\n"))
-if response not in ("y","Y","yes","Yes"):
-   exit()
 
 # read from csv to get skill descriptions
 df = pd.read_csv('./data/skill_list.csv')

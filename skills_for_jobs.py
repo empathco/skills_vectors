@@ -17,6 +17,8 @@ from pymilvus import (
 
 from qdrant_client import QdrantClient
 
+from qdrant_client.models import Filter, FieldCondition, FilterSelector, MatchValue
+
 MAX_JOBS = 5000 # all jobs
 MAX_SKILLS = 10
 NUM_LISTS = 4
@@ -63,7 +65,7 @@ def init_pg():
 
 def init_qdrant():
     client = QdrantClient(
-        url="https://b6799a17-ad6f-4f78-9401-53de8faea2fd.us-east4-0.gcp.cloud.qdrant.io:6333", 
+        url=os.environ['QDRANT_URL'], 
         api_key=os.environ['QDRANT_API_KEY']
     )
     return client 
@@ -79,8 +81,6 @@ def pinecone_search(index,job_vec,provider="gemini"):
         result = None
     end = time.time()
     duration = end - start
-
-
     print (f"Query time Pinecone: {duration} seconds")
     tot_durations['pinecone'] += duration 
     return result
@@ -141,11 +141,11 @@ def milvus_search(collection,job_vec):
     tot_durations['milvus'] += duration 
     return result 
 
-def pg_search(cursor,job_vec):
+def pg_search(cursor,job_vec,provider):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
     #print(f"Finding skills for job {job.loc['job_code']}")
-    query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]',embedding AS score FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
+    query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]',embedding AS score FROM skills WHERE provider='"+ provider + "' ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
     #print(f"Query {query}")
     start = time.time()
     cursor.execute(query)
@@ -156,10 +156,22 @@ def pg_search(cursor,job_vec):
     tot_durations['pg'] += duration
     return skills 
 
-def qdrant_search(client,job_vec):
+def qdrant_search(client,job_vec,provider):
     start = time.time()   
     try: 
-        results = client.search(collection_name="skills",query_vector=job_vec,with_payload=True,with_vectors=True, limit=MAX_SKILLS)
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="city",
+                    match=MatchValue(
+                        value="London",
+                    ),
+                )
+            ]
+        )
+
+        results = client.search(collection_name="skills",query_vector=job_vec,query_filter=query_filter,
+                                with_payload=True,with_vectors=True, limit=MAX_SKILLS)
     except Exception as e:
         print(f"Failed Qdrant search {e}")
         results = None
@@ -345,13 +357,13 @@ def save_job_skills_qdrant(job_skills,best_vector,filename,job_skills_best=None)
 
 # use the Postgres exact nearest neighbor search to find the "right" answers 
 # to evaluate the index Approximate Nearest Neighbor accuracy
-def get_nearest_neighbor_skills(cursor,job_vec):
+def get_nearest_neighbor_skills(cursor,job_vec,provider):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
     #print(f"Finding skills for job {job.loc['job_code']}")
     # setting probes to the numnber of lists forces Exact Nearest Neighbor search
     query = "BEGIN;SET LOCAL ivfflat.probes = "+str(NUM_LISTS)+";"
-    query += "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]' AS score,embedding FROM skills ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
+    query += "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]' AS score,embedding FROM skills WHERE provider='"+ provider +"'ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
     #query += ";COMMIT;"
     #print(f"Query {query}")
     start = time.time()
@@ -372,9 +384,9 @@ def get_nearest_neighbor_skills(cursor,job_vec):
     print(f"Query time Postgres exact nearest neighbor search: {duration} seconds\n")
     cursor.execute("COMMIT")
     tot_durations['best'] += duration
-    #print(f"Best skills: {nn_skills}")
-    closest_vector = np.array(ast.literal_eval(results[0][3]))
-    #print(f"Closest vector {results[0][2]}")
+    print(f"Best skills: {nn_skills}")
+    closest_vector = np.array(ast.literal_eval(results[0][2]))
+    print(f"Closest vector {results[0][2]}")
     return nn_skills,closest_vector
 
 provider = sys.argv[1]
@@ -384,7 +396,8 @@ jobs_df = pd.read_csv(jobs_path)
 if jobs_df.size == 0:
     print ("No jobs are available.")
     exit()
-jobs_vectors = np.load('./data/generic_job_desc_use.npy')
+job_embeddings = './data/generic_job_desc_' + provider + '.npy' 
+jobs_vectors = np.load(job_embeddings)
 
 job_skills_pinecone = {}
 job_skills_weaviate = {}
@@ -413,7 +426,7 @@ for i, job in jobs_df.iterrows():
         job_skills_pinecone[job['job_code']] = result
 
     job_skills_weaviate[job['job_code']] = weaviate_search(weaviate_client,job_vec,provider)
-    job_skills_milvus[job['job_code']] = milvus_search(milvus_collection,job_vec,provider)
+    job_skills_milvus[job['job_code']] = milvus_search(milvus_collection,job_vec)
     job_skills_pg[job['job_code']] = pg_search(pg_cursor,job_vec,provider)  
     job_skills_qdrant[job['job_code']] = qdrant_search(qdrant_client,job_vec,provider)
     best_skills,best_vector = get_nearest_neighbor_skills(pg_cursor,job_vec,provider) 
