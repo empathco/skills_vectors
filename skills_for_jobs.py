@@ -210,14 +210,14 @@ def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=Non
     df = pd.DataFrame(rows)
     df.to_csv(filename)
 
-def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=None):
+def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=None,provider="gemini"):
     #print(f"Weaviate: evaluating {len(job_skills)} skills")
     rows=[]
     avg_similarities=[]
     all_matches = 0 
     for key,job in job_skills.items():
         row = {"job":key}
-        skills=job['data']['Get']['Skill']
+        skills=job['data']['Get']['skills']
         i=0
         prev_skill = None
         similarities=[]
@@ -374,7 +374,7 @@ def get_nearest_neighbor_skills(cursor,job_vec,provider):
     print(f"Query time Postgres exact nearest neighbor search: {duration} seconds\n")
     #cursor.execute("COMMIT")
     tot_durations['best'] += duration
-    print(f"Best skills: {nn_skills}")
+    #print(f"Best skills: {nn_skills}")
     closest_vector = np.array(ast.literal_eval(results[0][3]))
     print(f"Closest vector {results[0][2]}")
     return nn_skills,closest_vector

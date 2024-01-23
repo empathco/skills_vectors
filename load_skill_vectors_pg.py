@@ -35,7 +35,7 @@ start = time.time()
 try:
     for i,row in ids_df.iterrows():
       #print(f"Row {row}")
-      query = "INSERT INTO "+table_name+"(ABBREVIATION,EMBEDDING,LEVEL,PROVIDER) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + ",'" + provider +"');"
+      query = "INSERT INTO "+table_name+"(ABBREVIATION,EMBEDDING,LEVEL) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + ");"
       cursor.execute(query)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:
