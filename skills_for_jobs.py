@@ -144,7 +144,8 @@ def pg_search(cursor,job_vec,provider):
     vec_list = job_vec.tolist()
     vec_str =  ",".join(str(num) for num in vec_list)
     #print(f"Finding skills for job {job.loc['job_code']}")
-    query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]',embedding AS score FROM skills WHERE provider='"+ provider + "' ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
+    table_name=provider+"_skills"
+    query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]',embedding AS score FROM "+table_name+" ORDER BY score DESC LIMIT "+str(MAX_SKILLS)
     #print(f"Query {query}")
     start = time.time()
     cursor.execute(query)
@@ -350,8 +351,9 @@ def get_nearest_neighbor_skills(cursor,job_vec,provider):
     vec_str =  ",".join(str(num) for num in vec_list)
     #print(f"Finding skills for job {job.loc['job_code']}")
     # setting probes to the numnber of lists forces Exact Nearest Neighbor search
-    query = "BEGIN;SET LOCAL ivfflat.probes = "+str(NUM_LISTS)+";"
-    query += "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]' AS score,embedding FROM skills WHERE provider='"+ provider +"'ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
+    table_name=provider+"_skills"
+    #query = "BEGIN;SET LOCAL ivfflat.probes = "+str(NUM_LISTS)+";"
+    query = "SELECT abbreviation,level,embedding <=> '[" + vec_str +"]' AS score,embedding FROM "+table_name+" ORDER BY score DESC LIMIT "+str(MAX_SKILLS*10) 
     #query += ";COMMIT;"
     #print(f"Query {query}")
     start = time.time()
@@ -370,14 +372,17 @@ def get_nearest_neighbor_skills(cursor,job_vec,provider):
             break       
     duration = end - start
     print(f"Query time Postgres exact nearest neighbor search: {duration} seconds\n")
-    cursor.execute("COMMIT")
+    #cursor.execute("COMMIT")
     tot_durations['best'] += duration
     print(f"Best skills: {nn_skills}")
-    closest_vector = np.array(ast.literal_eval(results[0][2]))
+    closest_vector = np.array(ast.literal_eval(results[0][3]))
     print(f"Closest vector {results[0][2]}")
     return nn_skills,closest_vector
 
-provider = sys.argv[1]
+if len(sys.argv)<2:
+    provider="gemini"
+else:
+    provider = sys.argv[1]
 
 jobs_path = './data/generic_job_list.csv'
 jobs_df = pd.read_csv(jobs_path)

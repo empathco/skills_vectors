@@ -26,14 +26,16 @@ DATABASE_URL = os.environ['DATABASE_URL']
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 
 cursor = conn.cursor()
-cmd = "DELETE FROM SKILLS;"
+table_name=provider+"_skills"
+cmd = "DELETE FROM "+table_name+";"
 cursor.execute(cmd)
+
 # search for skills
 start = time.time()
 try:
     for i,row in ids_df.iterrows():
       #print(f"Row {row}")
-      query = "INSERT INTO SKILLS(ABBREVIATION,EMBEDDING,LEVEL,PROVIDER) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + ",'" + provider +"');"
+      query = "INSERT INTO "+table_name+"(ABBREVIATION,EMBEDDING,LEVEL,PROVIDER) VALUES('" + row.iloc[0] + "','[" + ','.join([str(j) for j in vectors[i]]) + "]',"+str(row['level']) + ",'" + provider +"');"
       cursor.execute(query)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:
@@ -46,7 +48,7 @@ print(f"{num_vectors} vectors uploaded in {duration} seconds")
 # create index for skills
 start = time.time()
 try:
-    cmd = "CREATE INDEX IF NOT EXISTS SKILLS_INDEX ON SKILLS USING ivfflat (embedding vector_cosine_ops) WITH (lists = "+ str(NUM_LISTS) + ");"
+    cmd = "CREATE INDEX IF NOT EXISTS SKILLS_INDEX ON "+ table_name +" USING ivfflat (embedding vector_cosine_ops) WITH (lists = "+ str(NUM_LISTS) + ");"
     cursor.execute(cmd)  
     conn.commit()
 except (Exception, psycopg2.DatabaseError) as error:
