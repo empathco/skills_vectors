@@ -107,6 +107,7 @@ def weaviate_search(client,job_vec,provider="gemini"):
 
     end = time.time()
     duration = end - start
+    #print(f"Weaviate search result {result}")
     job_skills_weaviate[job['job_code']]=result
     print (f"Query time Weaviate: {duration} seconds")
     tot_durations['weaviate'] += duration 
@@ -215,9 +216,14 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
     rows=[]
     avg_similarities=[]
     all_matches = 0 
+    if provider == "openai":
+        class_name = "Openai_Skill"
+    else:
+        class_name = "Gemini_Skill"
     for key,job in job_skills.items():
         row = {"job":key}
-        skills=job['data']['Get']['skills']
+        #print(f"Job data {job['data']}")
+        skills=job['data']['Get'][class_name]
         i=0
         prev_skill = None
         similarities=[]
@@ -431,7 +437,7 @@ save_job_skills_pinecone(job_skills_pinecone,best_vector,'job_skills_pinecone'+p
 
 avg_query_time = tot_durations['weaviate'] / len(job_skills_weaviate)
 print(f"Weaviate: total query time {tot_durations['weaviate']}, average {avg_query_time}")
-save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate_'+provider+'.csv',job_skills_best)
+save_job_skills_weaviate(job_skills_weaviate,best_vector,'job_skills_weaviate_'+provider+'.csv',job_skills_best,provider)
 
 avg_query_time = tot_durations['milvus'] / len(job_skills_milvus)
 print(f"Milvus: Total query time {tot_durations['milvus']}, average {avg_query_time}")
