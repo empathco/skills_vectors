@@ -89,6 +89,7 @@ def weaviate_search(client,job_vec,provider="gemini"):
         return None 
     start = time.time()
     result = None 
+    errors = 0
     try: 
         class_name=provider+"_Skill"
         result = (
@@ -185,16 +186,16 @@ def save_job_skills_pinecone(job_skills,best_vector,filename,job_skills_best=Non
     for key,job in job_skills.items():
         count = 0 
         row = {"job":key}
-        prev_skill = None 
         similarities=[]
         skill_matches = 0 
+        skill_names = []
         for i in range(len(job['matches'])):
             #print(f"Matches {job['matches']}")
             if i< len(job['matches']):
                 value = row["skill"+str(i)]=job['matches'][i]['id']
-                if value == prev_skill:
+                if value in skill_names: # don't add same skill twice
                     continue
-                prev_skill = value
+                skill_names.append(value)
                 if job_skills_best and (value in job_skills_best[key]):
                     skill_matches += 1
                 row["level"+str(i)]=job['matches'][i]['metadata']['level']
@@ -225,17 +226,17 @@ def save_job_skills_weaviate(job_skills,best_vector,filename,job_skills_best=Non
         #print(f"Job data {job['data']}")
         skills=job['data']['Get'][class_name]
         i=0
-        prev_skill = None
         similarities=[]
         skill_matches=0
         #print(f"Number of skills {len(skills)}")
+        skill_names=[]
         for skill in skills:
             value = row["skill"+str(i)]=skill['abbreviation']
             #print(f"Skill {value}") 
-            if value == prev_skill:
+            if value in skill_names:
                 #print(f"Duplicate skill {value}")
                 continue
-            prev_skill = value
+            skill_names.append(value)
             if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill['level']
@@ -265,15 +266,15 @@ def save_job_skills_milvus(job_skills,best_vector,filename,job_skills_best=None)
             break 
         i=0
         skill_matches = 0 
-        prev_skill = None
         similarities=[]
+        skill_names=[]
         for hit in job:
             if hit is None: 
                 break
             value = row["skill"+str(i)] = hit.entity.id
-            if value == prev_skill:
+            if value in skill_names:
                 continue
-            prev_skill = value
+            skill_names.append(value )
             if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=hit.entity.get('level')
@@ -298,13 +299,13 @@ def save_job_skills_pg(job_skills,best_vector,filename,job_skills_best=None):
         skills=job_skills[key]
         i=0
         skill_matches = 0 
-        prev_skill = None
+        skill_names = []
         similarities=[]
         for skill in skills:
             value = row["skill"+str(i)] = skill[0]
-            if value == prev_skill:
+            if value in skill_names:
                 continue
-            prev_skill = value
+            skill_names.append(value)
             if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)]=skill[1]
@@ -328,13 +329,13 @@ def save_job_skills_qdrant(job_skills,best_vector,filename,job_skills_best=None)
     for key,value in job_skills.items():
         row={"job":key}
         skill_matches = 0 
-        prev_skill = None
+        skill_names = []
         similarities=[]
         for skill in value: 
             value = row["skill"+str(i)] = skill.payload['abbreviation']
-            if value== prev_skill:
+            if value in skill_names:
                 continue
-            prev_skill = ValueError
+            skill_names.append(value)
             if job_skills_best and (value in job_skills_best[key]):
                 skill_matches += 1
             row["level"+str(i)] = skill.payload['l']
@@ -367,12 +368,12 @@ def get_nearest_neighbor_skills(cursor,job_vec,provider):
     results = cursor.fetchall()
     end = time.time()
     nn_skills = []
-    prev_skill = None
+    skill_names = []
     for result in results:
-        skill = result[0]
-        if skill == prev_skill:
+        value = result[0]
+        if value in skill_names:
             continue
-        prev_skill = skill
+        skill_names.append(value)
         nn_skills.append(result)
         if len(nn_skills)>=MAX_SKILLS:
             break       
